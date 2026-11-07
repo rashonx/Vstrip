@@ -15,6 +15,10 @@ int main (int argc, char** argv)
         proc.apvts.getParameter (id)->setValueNotifyingHost (v);
 
     std::unique_ptr<juce::AudioProcessorEditor> editor (proc.createEditor());
+    // Optional: layout and skin numbers after the output path
+    if (argc > 3)
+        if (auto* e = dynamic_cast<VocalSitterEditor*> (editor.get()))
+            e->setLook (juce::String (argv[2]).getIntValue(), juce::String (argv[3]).getIntValue());
     editor->setVisible (true);
 
     juce::AudioBuffer<float> buf (4, block);
