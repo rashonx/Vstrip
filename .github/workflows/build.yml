@@ -1,0 +1,34 @@
+name: Build Wheel Bridge
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: echo "number=$(grep -oP '<Version>\K[0-9.]+' src/WheelBridge.csproj)" >> "$GITHUB_OUTPUT"
+
+      - name: Build single-file app
+        run: dotnet publish src/WheelBridge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Copy-Item SETUP.txt dist/
+          Get-ChildItem dist -Filter *.pdb | Remove-Item
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WheelBridge-Windows-v${{ steps.version.outputs.number }}
+          path: dist/

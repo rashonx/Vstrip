@@ -1,0 +1,44 @@
+WHEEL BRIDGE v1.0.0 - Dodge City Plugins
+Moza wheel -> Xbox controller, with a constant centring force
+=============================================================
+
+ONE-TIME SETUP
+1. Install ViGEmBus (creates the virtual Xbox controller):
+     https://github.com/nefarius/ViGEmBus/releases   (run the .exe installer)
+2. Install HidHide (hides the real wheel from games):
+     https://github.com/nefarius/HidHide/releases    (run the .exe installer)
+3. Restart your PC.
+4. In Moza Pit House, note your wheel rotation (for example 900 or 540).
+
+EVERY TIME YOU PLAY
+1. Open WheelBridge.exe.
+   - Windows may say "Windows protected your PC" because the app isn't signed.
+     Click "More info" then "Run anyway".
+   - Keep your feet off the pedals while it starts (it calibrates their resting position).
+2. Your Moza should be picked automatically. The centring force starts right away.
+   Use the Centring strength slider. Start low on a direct drive base.
+3. First time only: click "Hide wheel from games" and allow the Windows permission prompt.
+   (The game must not see the real wheel, or it will see two controllers.)
+4. First time only: map your pedals and buttons in section 3.
+   - Pedals: click Detect next to Throttle, press the pedal fully. Same for Brake.
+   - Buttons: click Set next to an Xbox button, then press the wheel button you want.
+   Suggested for Need for Speed Most Wanted:
+     A = confirm / handbrake, B = back, X = nitrous, Y = change camera,
+     LB / RB = shift paddles, Start = pause menu.
+5. Click START BRIDGE, then start Need for Speed Most Wanted.
+   The game sees an Xbox 360 controller. Use controller controls in the game menus.
+
+TUNING
+- "Wheel rotation set in Moza Pit House": must match Pit House.
+- "Full lock in game at": how far you turn the wheel for full steering in the game.
+  NFS is arcade-style, so 270-400 degrees usually feels right.
+- "Anti-deadzone": if small wheel movements do nothing in the game, raise this.
+- "Damper": adds weight and smoothness.
+- "Game rumble to wheel": crashes and bumps from the game shake the wheel.
+
+USING THE WHEEL IN OTHER GAMES
+Click "Show wheel to games" (or uninstall HidHide) so other games can see the Moza directly.
+
+SAFETY
+Direct drive wheels are strong. Keep hands clear when starting the bridge and raise the
+centring strength gradually.
