@@ -28,6 +28,8 @@ juce_add_plugin(VocalSitter
   VST3_CATEGORIES Fx EQ
   COPY_PLUGIN_AFTER_BUILD FALSE)
 
+juce_add_binary_data(SitterAssets SOURCES Assets/dodge_city_logo.png)
+
 target_sources(VocalSitter PRIVATE
   Source/SpectralCarver.cpp
   Source/PluginProcessor.cpp
@@ -40,7 +42,7 @@ target_compile_definitions(VocalSitter PUBLIC
   JUCE_DISPLAY_SPLASH_SCREEN=0)
 
 target_link_libraries(VocalSitter
-  PRIVATE juce::juce_audio_utils juce::juce_dsp
+  PRIVATE SitterAssets juce::juce_audio_utils juce::juce_dsp
   PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_lto_flags juce::juce_recommended_warning_flags)
 
 option(SITTER_BUILD_TESTS "Build the smoke test" OFF)

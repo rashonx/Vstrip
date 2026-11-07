@@ -1,5 +1,6 @@
 #include "PluginEditor.h"
 #include "Artwork.h"
+#include <BinaryData.h>
 
 namespace
 {
@@ -11,7 +12,7 @@ namespace
     const juce::Colour vocalGold  (0xfff2b84b);
     const juce::Colour mixGreen   (0xff6ec6a8);
 
-    constexpr int editorWidth = 1000, editorHeight = 660, headerHeight = 112, gap = 12;
+    constexpr int editorWidth = 1120, editorHeight = 660, headerHeight = 112, gap = 12;
 }
 
 //==============================================================================
@@ -441,8 +442,13 @@ void VocalSitterEditor::paint (juce::Graphics& g)
     g.drawText ("S I D E C H A I N   V O C A L   S P A C E", juce::Rectangle<float> (header.getX() + 2.0f, baseline + 14.0f, titleWidth + 40.0f, 16.0f),
                 juce::Justification::centredLeft);
     header.removeFromLeft (titleWidth + 14.0f);
-    drawCondenserMic (g, header.removeFromLeft (64.0f));
-    header.removeFromLeft (24.0f);
+
+    // Dodge City Plugins logo, centred in the window
+    const auto logo = juce::ImageCache::getFromMemory (BinaryData::dodge_city_logo_png, BinaryData::dodge_city_logo_pngSize);
+    const float logoH = 92.0f, logoW = logoH * (float) logo.getWidth() / (float) juce::jmax (1, logo.getHeight());
+    const auto logoArea = juce::Rectangle<float> (logoW, logoH).withCentre ({ (float) getWidth() * 0.5f, header.getCentreY() });
+    g.drawImage (logo, logoArea, juce::RectanglePlacement::centred);
+    header = header.withLeft (logoArea.getRight() + 28.0f);
 
     // Meters in a 2 x 2 grid
     meterArea = header.toNearestInt().expanded (2);
