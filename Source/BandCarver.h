@@ -63,6 +63,7 @@ private:
     std::array<std::array<Biquad, 2>, numBands> cut;   // the filters that dip the beat
     std::array<Biquad, numBands> keyBand, keyBand2, beatBand; // analysis band-passes (vocal uses two in a row for sharper bands)
     std::array<float, numBands> keyEnv {}, beatEnv {}, gainDb {}, cosW {}, alphaCut {};
+    std::array<bool, numBands> active {}; // bands with nothing to cut are skipped, so the beat passes through untouched
     float amount = 0.5f, lowCut = 20.0f, highCut = 20000.0f;
     float attackCoeff = 0.0f, releaseCoeff = 0.0f, meterCoeff = 0.0f, smoothCoeff = 0.0f;
     Stereo stereo = Stereo::both;

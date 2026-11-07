@@ -50,6 +50,7 @@ void BandCarver::reset()
     keyEnv.fill (0.0f);
     beatEnv.fill (0.0f);
     gainDb.fill (0.0f);
+    active.fill (false);
     updateGains();
     subBlockCounter = 0;
 }
@@ -99,6 +100,17 @@ void BandCarver::updateGains()
         const float target = -amount * maxDepthDb * strength * rangeWeight (bandFrequency (b));
         auto& g = gainDb[(size_t) b];
         g = smoothCoeff * g + (1.0f - smoothCoeff) * target;
+        if (g > -0.001f && target > -0.001f)
+        {
+            active[(size_t) b] = false;
+            continue;
+        }
+        if (! active[(size_t) b])
+        {
+            cut[(size_t) b][0].clear();
+            cut[(size_t) b][1].clear();
+            active[(size_t) b] = true;
+        }
 
         // Peaking bell: exactly flat when the gain is 0 dB
         const float A = std::pow (10.0f, g / 40.0f);
@@ -149,7 +161,8 @@ void BandCarver::process (juce::AudioBuffer<float>& beat, int numChannels, const
         auto runBank = [this] (float x, int ch)
         {
             for (int b = 0; b < numBands; ++b)
-                x = cut[(size_t) b][(size_t) ch].process (x);
+                if (active[(size_t) b])
+                    x = cut[(size_t) b][(size_t) ch].process (x);
             return x;
         };
 
