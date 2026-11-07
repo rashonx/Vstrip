@@ -24,7 +24,7 @@ private:
     VocalSitterProcessor& processor;
     static constexpr int numBands = CarveDisplayData::numBands;
     std::array<float, numBands> beat {}, vocal {}, cut {};
-    bool hasVocal = false;
+    bool hasVocal = false, listening = false, connected = false;
 };
 
 class VocalSitterEditor : public juce::AudioProcessorEditor, private juce::Timer
@@ -60,6 +60,8 @@ private:
     juce::Label stereoLabel, autoGainLabel;
     juce::ToggleButton autoGainButton;
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> autoGainAttachment;
+    juce::TextButton listenButton { "LISTEN TO CARVED PART" };
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> listenAttachment;
 
     juce::Rectangle<int> carvePanel, outputPanel, meterArea;
     float beatDb = -100.0f, vocalDb = -100.0f, outDb = -100.0f, autoDb = 0.0f;

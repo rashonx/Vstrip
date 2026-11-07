@@ -128,7 +128,17 @@ int main()
         check (std::abs (db (r7.outRms / r7.inRms)) < 1.0f, "auto gain matches input level (dB)", db (r7.outRms / r7.inRms));
         set (p, "autoGain", 0.0f);
 
-        // 7. No sidechain connected
+        // 7. Listen to carved part: silent vocal = silence; carved part + carved beat = original
+        set (p, "listen", 1.0f);
+        auto r9 = run (p, rate, 2.0f, beat, beat, silence); // 2 s: let the release from the last test finish
+        check (r9.outRms < 1.0e-5f, "listen mode is silent when nothing is carved (RMS)", r9.outRms);
+        auto r10 = run (p, rate, 1.0f, beatOnly1k, beatOnly1k, tone1k);
+        set (p, "listen", 0.0f);
+        auto r11 = run (p, rate, 1.0f, beatOnly1k, beatOnly1k, tone1k);
+        check (db (r10.outRms / r10.inRms) > -3.0f, "listen mode plays what was carved (dB vs input)", db (r10.outRms / r10.inRms));
+        check (db (r11.outRms / r11.inRms) < -12.0f, "normal mode plays the carved beat (dB)", db (r11.outRms / r11.inRms));
+
+        // 8. No sidechain connected
         auto layout = p.getBusesLayout();
         layout.inputBuses.getReference (1) = juce::AudioChannelSet::disabled();
         p.setBusesLayout (layout);

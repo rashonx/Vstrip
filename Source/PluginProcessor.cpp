@@ -31,6 +31,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout VocalSitterProcessor::create
     addFloat ("highCut", "High Cut", skewed (1000.0f, 20000.0f, 6000.0f), 20000.0f, hz);
     p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "stereo", 2 }, "Stereo", StringArray { "Stereo", "Mid", "Side" }, 0));
     p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "autoGain", 2 }, "Auto Gain", false));
+    p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "listen", 2 }, "Listen To Carved Part", false));
     addFloat ("outGain", "Output", { -24.0f, 12.0f, 0.1f }, 0.0f, db);
 
     return { p.begin(), p.end() };
@@ -66,6 +67,7 @@ void VocalSitterProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     carver.prepare (sampleRate);
     setLatencySamples (0);
     vocalKey.assign ((size_t) samplesPerBlock, 0.0f);
+    dryBuffer.setSize (2, samplesPerBlock);
     outGain.reset (sampleRate, 0.05);
     outGain.setCurrentAndTargetValue (juce::Decibels::decibelsToGain (param ("outGain")));
     autoGain.reset (sampleRate, 0.2);
@@ -103,6 +105,8 @@ void VocalSitterProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
         return;
     if ((int) vocalKey.size() < n)
         vocalKey.resize ((size_t) n);
+    if (dryBuffer.getNumSamples() < n || dryBuffer.getNumChannels() < channels)
+        dryBuffer.setSize (juce::jmax (2, channels), n, false, false, true);
 
     // 1. Vocal sidechain, mixed to mono
     std::fill (vocalKey.begin(), vocalKey.begin() + n, 0.0f);
@@ -117,27 +121,45 @@ void VocalSitterProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
             for (int i = 0; i < n; ++i)
                 vocalKey[(size_t) i] += d[i] / (float) sc;
         }
+        sidechainConnected = sc > 0;
         if (sc > 0)
             vocalPeak = peakDb (side, sc, n);
         else
             vocalPeak = -100.0f;
     }
     else
+    {
         vocalPeak = -100.0f;
+        sidechainConnected = false;
+    }
     vocalLevelDb = vocalPeak;
     beatLevelDb = peakDb (beat, channels, n);
     const double refSum = meanSquare (beat, channels, n);
 
-    // 2. Carve the beat
+    // 2. Carve the beat (keep a copy of the original for Listen to carved part)
+    for (int ch = 0; ch < channels; ++ch)
+        dryBuffer.copyFrom (ch, 0, beat, ch, 0, n);
     carver.setParams (param ("amount") * 0.01f, param ("attack"), param ("release"), param ("lowCut"), param ("highCut"),
                       (BandCarver::Stereo) juce::roundToInt (param ("stereo")));
     carver.process (beat, channels, vocalKey.data(), n);
 
-    // 3. Auto gain: slowly bring the carved beat back to its original loudness
+    // Listen to carved part: output only what was removed (original minus carved)
+    const bool listen = param ("listen") > 0.5f;
+    if (listen)
+        for (int ch = 0; ch < channels; ++ch)
+        {
+            auto* out = beat.getWritePointer (ch);
+            const auto* dry = dryBuffer.getReadPointer (ch);
+            for (int i = 0; i < n; ++i)
+                out[i] = dry[i] - out[i];
+        }
+
+    // 3. Auto gain: slowly bring the carved beat back to its original loudness (off while listening)
     const float alpha = std::exp (-(float) n / (0.4f * (float) sr));
     refPower = alpha * refPower + (1.0f - alpha) * (float) refSum;
-    outPower = alpha * outPower + (1.0f - alpha) * (float) meanSquare (beat, channels, n);
-    if (param ("autoGain") < 0.5f)
+    if (! listen)
+        outPower = alpha * outPower + (1.0f - alpha) * (float) meanSquare (beat, channels, n);
+    if (param ("autoGain") < 0.5f || listen)
         autoGain.setTargetValue (1.0f);
     else if (refPower > 1.0e-7f && outPower > 1.0e-10f)
         autoGain.setTargetValue (juce::jlimit (0.25f, 4.0f, std::sqrt (refPower / outPower)));

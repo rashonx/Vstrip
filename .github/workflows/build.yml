@@ -25,9 +25,14 @@ jobs:
           Copy-Item "build/VocalSitter_artefacts/Release/Standalone/Rashon Vocal Sitter.exe" dist/
           Copy-Item docs/INSTALL.txt dist/
 
+      - name: Read version
+        id: version
+        shell: bash
+        run: echo "number=$(grep -oP 'project\(RashonVocalSitter VERSION \K[0-9.]+' CMakeLists.txt)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: RashonVocalSitter-Windows
+          name: RashonVocalSitter-Windows-v${{ steps.version.outputs.number }}
           path: dist/
 
   linux-test:

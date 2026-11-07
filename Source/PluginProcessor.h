@@ -43,6 +43,7 @@ public:
 
     // Values read by the editor's meters
     std::atomic<float> beatLevelDb { -100.0f }, vocalLevelDb { -100.0f }, outputLevelDb { -100.0f }, autoGainDb { 0.0f };
+    std::atomic<bool> sidechainConnected { false };
 
 private:
     float param (const juce::String& id) const { return apvts.getRawParameterValue (id)->load(); }
@@ -50,6 +51,7 @@ private:
     double sr = 44100.0;
     BandCarver carver;
     std::vector<float> vocalKey;
+    juce::AudioBuffer<float> dryBuffer; // the beat before carving, for Listen to carved part
     juce::SmoothedValue<float> outGain, autoGain;
     float refPower = 0.0f, outPower = 0.0f;
 

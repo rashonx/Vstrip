@@ -66,7 +66,8 @@ void KnobLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, 
 {
     auto r = b.getLocalBounds().toFloat().reduced (1.0f);
     const bool on = b.getToggleState();
-    g.setColour (on ? vocalGold : juce::Colour (0xff2c313b));
+    const bool isListen = b.getButtonText().startsWith ("LISTEN");
+    g.setColour (on ? (isListen ? carveRed : vocalGold) : juce::Colour (0xff2c313b));
     g.fillRoundedRectangle (r, 5.0f);
     if (highlighted)
     {
@@ -96,6 +97,8 @@ void CarveView::update()
         loudestVocal = juce::jmax (loudestVocal, d.vocalDb[b].load());
     }
     hasVocal = loudestVocal > -90.0f;
+    listening = processor.apvts.getRawParameterValue ("listen")->load() > 0.5f;
+    connected = processor.sidechainConnected.load();
     repaint();
 }
 
@@ -215,6 +218,39 @@ void CarveView::paint (juce::Graphics& g)
     item (carveRed, "Carved out", false);
     item (vocalGold, "Vocal (sidechain)", true);
 
+    // Routing label: which signal is carved and which one does the carving
+    {
+        auto row = juce::Rectangle<float> (bars.getRight() - 470.0f, bars.getY() + 16.0f, 460.0f, 18.0f);
+        auto pill = [&] (juce::Rectangle<float> r, const juce::String& text, juce::Colour c)
+        {
+            g.setColour (c.withAlpha (0.18f));
+            g.fillRoundedRectangle (r, 9.0f);
+            g.setColour (c);
+            g.drawRoundedRectangle (r, 9.0f, 1.0f);
+            g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+            g.drawText (text, r, juce::Justification::centred);
+        };
+        const juce::String keyText = ! connected ? "SIDECHAIN: NOT CONNECTED"
+                                   : hasVocal   ? "SIDECHAIN (VOCAL): SIGNAL OK"
+                                                : "SIDECHAIN (VOCAL): NO SIGNAL";
+        const auto keyColour = connected && hasVocal ? vocalGold : carveRed;
+        pill (row.removeFromRight (230.0f), keyText, keyColour);
+        g.setColour (textDim);
+        g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+        g.drawText ("CARVED BY", row.removeFromRight (78.0f), juce::Justification::centred);
+        pill (row.removeFromRight (150.0f), "CARVING: THIS TRACK", beatBlue);
+    }
+
+    if (listening)
+    {
+        auto banner = juce::Rectangle<float> (300.0f, 26.0f).withCentre ({ bars.getCentreX(), bars.getY() + 56.0f });
+        g.setColour (carveRed);
+        g.fillRoundedRectangle (banner, 6.0f);
+        g.setColour (juce::Colours::white);
+        g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
+        g.drawText ("LISTENING TO THE CARVED PART ONLY", banner, juce::Justification::centred);
+    }
+
     if (! hasVocal)
     {
         g.setColour (juce::Colours::white.withAlpha (0.75f));
@@ -264,6 +300,13 @@ VocalSitterEditor::VocalSitterEditor (VocalSitterProcessor& p)
     autoGainButton.setColour (juce::ToggleButton::tickColourId, mixGreen);
     addAndMakeVisible (autoGainButton);
     autoGainAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (processor.apvts, "autoGain", autoGainButton);
+
+    listenButton.setClickingTogglesState (true);
+    listenButton.setColour (juce::TextButton::textColourOffId, juce::Colours::white.withAlpha (0.85f));
+    listenButton.setColour (juce::TextButton::textColourOnId, juce::Colours::black);
+    listenButton.setTooltip ("Hear only what is being carved out of this track");
+    addAndMakeVisible (listenButton);
+    listenAttachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (processor.apvts, "listen", listenButton);
 
     setSize (editorWidth, editorHeight);
     timerCallback();
@@ -364,6 +407,13 @@ void VocalSitterEditor::paint (juce::Graphics& g)
     const float titleWidth = firstWidth + juce::GlyphArrangement::getStringWidth (titleFont, second);
     g.setColour (textDim);
     g.setFont (juce::FontOptions (12.0f));
+    // Version number, so you can tell which build is installed
+    g.setColour (vocalGold);
+    g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
+    g.drawText ("v" JucePlugin_VersionString, juce::Rectangle<float> (header.getX() + titleWidth - 60.0f, baseline + 14.0f, 60.0f, 16.0f),
+                juce::Justification::centredRight);
+    g.setColour (textDim);
+    g.setFont (juce::FontOptions (12.0f));
     g.drawText ("S I D E C H A I N   T R A C K   S P A C E R", juce::Rectangle<float> (header.getX() + 2.0f, baseline + 14.0f, titleWidth + 40.0f, 16.0f),
                 juce::Justification::centredLeft);
     header.removeFromLeft (titleWidth + 14.0f);
@@ -442,8 +492,10 @@ void VocalSitterEditor::resized()
         const int bw = row.getWidth() / 3;
         for (auto* b : stereoButtons)
             b->setBounds (row.removeFromLeft (bw).reduced (2, 0));
-        r.removeFromTop (18);
+        r.removeFromTop (14);
         autoGainLabel.setBounds (r.removeFromTop (18));
         autoGainButton.setBounds (r.removeFromTop (24).withWidth (56));
+        r.removeFromTop (16);
+        listenButton.setBounds (r.removeFromTop (34));
     }
 }
