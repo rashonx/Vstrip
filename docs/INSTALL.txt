@@ -1,0 +1,9 @@
+VocalStrip - install on Windows
+================================
+
+1. Copy the "VocalStrip.vst3" folder to:
+       C:\Program Files\Common Files\VST3\
+2. Open your DAW and rescan plugins (FL Studio: Options > Manage plugins > Find plugins).
+3. Put VocalStrip on your vocal track as an insert effect.
+
+VocalStrip.exe is a standalone version you can run without a DAW (plug in a mic, use headphones).
