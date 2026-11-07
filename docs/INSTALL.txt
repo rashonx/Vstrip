@@ -1,7 +1,8 @@
 Rashon Soul Keys - install on Windows
 =====================================
 
-1. Copy the "Rashon Soul Keys.vst3" folder to:
+1. Delete any older "Rashon Soul Keys ....vst3" folders from the folder below, then copy in the new
+   "Rashon Soul Keys vX.Y.Z.vst3" folder (the number is the version) to:
        C:\Program Files\Common Files\VST3\
 2. Rescan plugins in your DAW and load Rashon Soul Keys as an INSTRUMENT on a MIDI/instrument track.
 

@@ -17,18 +17,23 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --target SoulKeys_VST3 SoulKeys_Standalone
 
-      - name: Package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item -Recurse "build/SoulKeys_artefacts/Release/VST3/Rashon Soul Keys.vst3" dist/
-          Copy-Item "build/SoulKeys_artefacts/Release/Standalone/Rashon Soul Keys.exe" dist/
-          Copy-Item docs/INSTALL.txt dist/
-
       - name: Read version
         id: version
         shell: bash
         run: echo "number=$(grep -oP 'project\(RashonSoulKeys VERSION \K[0-9.]+' CMakeLists.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Package (version number in the file names)
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.number }}"
+          $name = "Rashon Soul Keys"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $bundle = "dist/$name v$v.vst3"
+          Copy-Item -Recurse "build/SoulKeys_artefacts/Release/VST3/$name.vst3" $bundle
+          # The plugin file inside the bundle must have the same name as the bundle
+          Get-ChildItem "$bundle/Contents" -Recurse -File -Filter "$name.vst3" | Rename-Item -NewName "$name v$v.vst3"
+          Copy-Item "build/SoulKeys_artefacts/Release/Standalone/$name.exe" "dist/$name v$v.exe"
+          Copy-Item docs/INSTALL.txt "dist/INSTALL v$v.txt"
 
       - uses: actions/upload-artifact@v4
         with:
