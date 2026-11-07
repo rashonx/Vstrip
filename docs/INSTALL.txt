@@ -1,9 +1,10 @@
 Rashon X Vocal - install on Windows
 ====================================
 
-1. Copy the "Rashon X Vocal.vst3" folder to:
+1. Delete any older "Rashon X Vocal ....vst3" folders from the folder below, then copy in the new
+   "Rashon X Vocal vX.Y.Z.vst3" folder (the number is the version) to:
        C:\Program Files\Common Files\VST3\
 2. Open your DAW and rescan plugins (FL Studio: Options > Manage plugins > Find plugins).
 3. Put Rashon X Vocal on your vocal track as an insert effect.
 
-Rashon X Vocal.exe is a standalone version you can run without a DAW (plug in a mic, use headphones).
+Rashon X Vocal vX.Y.Z.exe is a standalone version you can run without a DAW (plug in a mic, use headphones).
