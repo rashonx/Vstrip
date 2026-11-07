@@ -1,0 +1,22 @@
+Rashon Vocal Sitter - install on Windows
+========================================
+
+1. Copy the "Rashon Vocal Sitter.vst3" folder to:
+       C:\Program Files\Common Files\VST3\
+2. Open your DAW and rescan plugins.
+
+How to set it up (FL Studio)
+----------------------------
+1. Put Rashon Vocal Sitter on your VOCAL mixer track.
+2. Select your BEAT mixer track. Right-click the little arrow at the bottom of the
+   vocal track and choose "Sidechain to this track". Also turn OFF the beat track's
+   send to Master (click the arrow under the beat track pointing to Master).
+3. In the plugin wrapper (gear icon) > Processing tab, set the sidechain input
+   to the beat's track number.
+4. You should now see the beat in blue on the display. Turn up CARVE AMOUNT.
+
+Because the beat now plays through the plugin (Beat to output = ON), the vocal
+track outputs the vocal plus the carved beat together.
+
+Other DAWs: put the plugin on the vocal track, pick the beat as its sidechain
+input, and mute the beat's normal output.

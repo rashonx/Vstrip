@@ -1,0 +1,43 @@
+name: Build plugin
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure
+        run: cmake -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --target VocalSitter_VST3 VocalSitter_Standalone
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item -Recurse "build/VocalSitter_artefacts/Release/VST3/Rashon Vocal Sitter.vst3" dist/
+          Copy-Item "build/VocalSitter_artefacts/Release/Standalone/Rashon Vocal Sitter.exe" dist/
+          Copy-Item docs/INSTALL.txt dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RashonVocalSitter-Windows
+          path: dist/
+
+  linux-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev libxi-dev libxext-dev libfreetype-dev libfontconfig1-dev ninja-build
+      - name: Build and run smoke test
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSITTER_BUILD_TESTS=ON
+          cmake --build build --target SitterSmokeTest
+          ./build/SitterSmokeTest
