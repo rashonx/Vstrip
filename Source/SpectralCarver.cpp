@@ -123,7 +123,7 @@ void SpectralCarver::processFrame (int numBeatChannels)
     auto loadFrame = [this] (const std::vector<float>& fifo)
     {
         for (int n = 0; n < fftSize; ++n)
-            frame[(size_t) n] = fifo[(size_t) ((pos + n) & mask)] * window[(size_t) n];
+            frame[(size_t) n] = fifo[(size_t) ((pos + n) & (fftSize - 1))] * window[(size_t) n];
         std::fill (frame.begin() + fftSize, frame.end(), 0.0f);
         fft.performRealOnlyForwardTransform (frame.data(), true);
     };
