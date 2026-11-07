@@ -9,7 +9,15 @@ int main (int argc, char** argv)
     SoulKeysProcessor proc;
     proc.setRateAndBufferSizeDetails (48000.0, 512);
     proc.prepareToPlay (48000.0, 512);
+    auto set = [&] (const char* id, float v) { auto* q = proc.apvts.getParameter (id); q->setValueNotifyingHost (q->convertTo0to1 (v)); };
+    set ("split", 1.0f);
+    set ("chordSetB", 18.0f);
+    set ("extensionsB", 2.0f);
+    proc.applySoundPreset (1, 7);
     std::unique_ptr<juce::AudioProcessorEditor> editor (proc.createEditor());
+    if (argc > 2)
+        if (auto* e = dynamic_cast<SoulKeysEditor*> (editor.get()))
+            e->setSkin (juce::String (argv[2]).getIntValue());
     editor->setVisible (true);
 
     std::thread audio ([&]
@@ -18,7 +26,7 @@ int main (int argc, char** argv)
         for (int b = 0; b < 60; ++b)
         {
             juce::MidiBuffer midi;
-            if (b == 2) midi.addEvent (juce::MidiMessage::noteOn (1, 62, 0.8f), 0);
+            if (b == 2) { midi.addEvent (juce::MidiMessage::noteOn (1, 50, 0.8f), 0); midi.addEvent (juce::MidiMessage::noteOn (1, 69, 0.8f), 0); }
             proc.processBlock (buf, midi);
             juce::Thread::sleep (10);
         }

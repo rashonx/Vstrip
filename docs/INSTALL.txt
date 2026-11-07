@@ -23,3 +23,22 @@ Click "PULL CHORDS FROM FILE..." or drag a file onto the plugin window.
 - Audio files (WAV, AIFF, FLAC, MP3, OGG): the chords are detected and made lush (major -> maj9,
   minor -> m9, dominant -> 9). Works best on clear piano or guitar chords; busy full mixes are harder.
 The first 7 chords go on the white keys, the next 5 on the black keys. They are saved with your project.
+
+New in v1.1.0
+-------------
+SPLIT MODE
+- Turn on SPLIT MODE and pick the split key (default C4). Keys below the split play ZONE A,
+  keys from the split up play ZONE B. Each zone has its own chord set, key, scale, extensions,
+  octave and sound (use the ZONE A SOUND / ZONE B SOUND tabs).
+- In split mode both zones play in the same comfortable register, so moving between them
+  sounds like one player. Use each zone's OCTAVE buttons to move a zone up or down.
+- SWAP A / B swaps the two zones' chord settings. Each zone has its own FROM FILE... button.
+
+KEY & SCALE
+- KEY moves any chord set to a new key ("Original" keeps the preset's own key).
+- Pick the "Key & Scale chords" chord set to build lush chords from a key and SCALE:
+  Major, Minor, Dorian, Mixolydian, Lydian, Phrygian, Harmonic Minor, Melodic Minor.
+
+SKINS
+- 15 skins in the SKIN menu at the top right. Your choice is saved with the project and
+  remembered for new instances.

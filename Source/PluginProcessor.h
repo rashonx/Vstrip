@@ -5,11 +5,17 @@
 #include "Chords.h"
 #include "SoundEngine.h"
 
-// One key plays a whole neo soul chord. White keys = the preset's chords,
+// One key plays a whole neo soul chord. White keys = the chord set's chords,
 // black keys = related chords that lead into the next white key.
+// Split mode: keys below the split point use zone A, keys above use zone B,
+// each with its own chord set, key, scale, extensions, octave and sound.
 class SoulKeysProcessor : public juce::AudioProcessor
 {
 public:
+    static constexpr int numZones = 2;
+    static constexpr int scaleSlot = 50;  // chord-set index of "Key & Scale"
+    static constexpr int fileSlot = 51;   // chord-set index of "From file"
+
     SoulKeysProcessor();
     ~SoulKeysProcessor() override = default;
 
@@ -38,51 +44,71 @@ public:
     juce::AudioProcessorValueTreeState apvts;
     juce::MidiKeyboardState keyboardState;
 
-    // Chord sets: the 50 presets plus one slot filled from a MIDI or audio file
-    int numChordSets() const { return ChordPresets::count() + 1; }
-    int userSlot() const { return ChordPresets::count(); }
-    ChordSet getChordSet (int index) const;
-    ChordSet currentChordSet() const;
-    void setUserChords (const ChordSet& set);
-    bool hasUserChords() const;
+    // Parameter id for a zone: zone A uses the plain id, zone B adds "B"
+    static juce::String pid (int zone, const char* base) { return zone == 0 ? juce::String (base) : juce::String (base) + "B"; }
 
-    // The chord a key would play right now (with extensions applied), for the display
-    Chord chordForKey (int pitchClass) const;
+    int numChordSets() const { return fileSlot + 1; }
+    juce::String chordSetName (int zone, int index) const;
+    ChordSet getChordSet (int zone, int index) const;   // as written, before key transposition
+    void setUserChords (int zone, const ChordSet& set); // also selects "From file" for that zone
+    bool hasUserChords (int zone) const;
 
-    // What's playing, for the window
-    std::atomic<int> lastKeyPc { -1 };
-    std::atomic<bool> keyHeld[12] {};
+    bool splitOn() const { return param (splitParam) > 0.5f; }
+    int splitPoint() const { return juce::roundToInt (param (splitPointParam)); }
+    int zoneOf (int key) const { return splitOn() && key >= splitPoint() ? 1 : 0; }
 
-    void applySoundPreset (int index);
+    // The chord a key would play right now, for the display
+    Chord chordForKey (int pitchClass, int zone) const;
+
+    void applySoundPreset (int zone, int index);
+    void swapZones();
+
+    std::atomic<int> lastKeyPc[numZones] { -1, -1 };
+    std::atomic<bool> keyHeld[numZones][12] {};
 
 private:
-    struct Pending { double time; int note; float velocity; int sourceKey; };
+    struct Pending { double time; int note; float velocity; int sourceKey; int zone; };
 
+    struct ZoneParams
+    {
+        std::atomic<float> *chordSet, *extensions, *octave, *key, *scale, *sound;
+        std::atomic<float> *bell, *bark, *decay, *tone, *tremRate, *tremDepth, *chorus, *wobble, *age, *hiss, *reverb, *volume;
+    };
+
+    struct Zone
+    {
+        juce::Synthesiser synth;
+        VoiceSettings voice;
+        FxChain fx;
+        FxSettings fxSettings;
+        ChordSet user;            // chords pulled from a file
+        ChordSet scaleSet;        // cached "Key & Scale" chords (audio thread only)
+        int scaleKey = -1, scaleIndex = -1;
+        std::array<int, 128> refs {};
+        juce::MidiBuffer midi;
+        juce::AudioBuffer<float> buffer;
+        ZoneParams p {};
+    };
+
+    float param (std::atomic<float>* p) const { return p->load(); }
     float param (const char* id) const { return apvts.getRawParameterValue (id)->load(); }
-    Chord resolveChord (int key, std::vector<int>& previousUpper) const;
+    Chord pickChord (int zone, int pc, bool forDisplay) const;
+    Chord resolveChord (int key, int zone, std::vector<int>* previousUpper, bool forDisplay) const;
     void handleKeyOn (int key, float velocity, int samplePos);
     void handleKeyOff (int key, int samplePos);
-    void emitDue (juce::MidiBuffer& out, int numSamples);
+    void emitDue (int numSamples);
 
-    juce::Synthesiser synth;
-    VoiceSettings voiceSettings;
-    FxChain fx;
-    FxSettings fxSettings;
-
+    std::array<Zone, numZones> zones;
+    std::atomic<float> *splitParam = nullptr, *splitPointParam = nullptr;
     mutable juce::CriticalSection chordLock;
-    ChordSet userChords;
-    mutable int cachedSetIndex = -1;
-    mutable ChordSet cachedSet;
 
-    // Chord triggering
     std::vector<Pending> pending;
-    std::array<std::vector<int>, 128> notesFromKey;  // output notes started by each input key
-    std::array<int, 128> noteRefs {};                 // how many held keys share each output note
-    std::vector<int> lastUpper;                       // for voice leading
+    std::array<std::vector<int>, 128> notesFromKey;
+    std::array<int, 128> keyZone {};
+    std::vector<int> lastUpper; // shared by both zones, so moves between them stay smooth
     double blockStart = 0.0;
     bool strumUp = true;
     juce::Random rng;
-    juce::MidiBuffer expanded;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SoulKeysProcessor)
 };

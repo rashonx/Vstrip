@@ -33,6 +33,7 @@ namespace ChordExtractor
     {
         ChordSet set;
         set.name = "From file: " + name;
+        set.tonic = found.front().root;
         for (size_t i = 0; i < 7; ++i)
             set.chords[(size_t) ChordPresets::whitePcs[i]] = found[i % found.size()];
         if (found.size() > 7)

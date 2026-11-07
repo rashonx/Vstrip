@@ -293,6 +293,7 @@ namespace ChordPresets
         const auto& p = palettes()[(size_t) juce::jlimit (0, count() - 1, index)];
         ChordSet set;
         set.name = juce::String (index + 1).paddedLeft ('0', 2) + "  " + p.name + "  (" + ChordQ::noteName (p.tonic) + ")";
+        set.tonic = p.tonic;
         for (size_t i = 0; i < 7; ++i)
         {
             auto& c = set.chords[(size_t) whitePcs[i]];
@@ -304,4 +305,82 @@ namespace ChordPresets
         fillBlackKeys (set, p.flavours);
         return set;
     }
+}
+
+namespace ScaleChords
+{
+    static const std::array<std::array<int, 7>, 8> scales {{
+        { 0, 2, 4, 5, 7, 9, 11 },   // Major
+        { 0, 2, 3, 5, 7, 8, 10 },   // Natural Minor
+        { 0, 2, 3, 5, 7, 9, 10 },   // Dorian
+        { 0, 2, 4, 5, 7, 9, 10 },   // Mixolydian
+        { 0, 2, 4, 6, 7, 9, 11 },   // Lydian
+        { 0, 1, 3, 5, 7, 8, 10 },   // Phrygian
+        { 0, 2, 3, 5, 7, 8, 11 },   // Harmonic Minor
+        { 0, 2, 3, 5, 7, 9, 11 },   // Melodic Minor
+    }};
+
+    juce::StringArray scaleNames()
+    {
+        return { "Major", "Minor", "Dorian", "Mixolydian", "Lydian", "Phrygian", "Harmonic Minor", "Melodic Minor" };
+    }
+
+    // Picks a lush (9th-level) quality from the 3rd, 5th, 7th and 9th the scale gives this degree
+    static int qualityFor (int third, int fifth, int seventh, int ninth)
+    {
+        using namespace ChordQ;
+        if (third == 4 && fifth == 7 && seventh == 11) return ninth == 2 ? M9 : M7;
+        if (third == 4 && fifth == 8 && seventh == 11) return M7s5;
+        if (third == 3 && fifth == 7 && seventh == 10) return ninth == 2 ? m9 : m7;
+        if (third == 3 && fifth == 7 && seventh == 11) return ninth == 2 ? mM9 : m7;
+        if (third == 4 && fifth == 7 && seventh == 10) return ninth == 2 ? d9 : ninth == 1 ? d13b9 : d7s9;
+        if (third == 3 && fifth == 6 && seventh == 10) return ninth == 2 ? h9 : m7b5;
+        if (third == 3 && fifth == 6 && seventh == 9)  return dim7;
+        if (third == 4 && fifth == 6)                  return d9s11;
+        return third == 4 ? M9 : m9;
+    }
+
+    ChordSet make (int keyPc, int scaleIndex)
+    {
+        const auto& sc = scales[(size_t) juce::jlimit (0, (int) scales.size() - 1, scaleIndex)];
+        ChordSet set;
+        set.tonic = keyPc;
+        set.name = ChordQ::noteName (keyPc) + " " + scaleNames()[scaleIndex] + " (scale chords)";
+        auto degree = [&] (int d) { return sc[(size_t) (d % 7)] + 12 * (d / 7); };
+        for (int d = 0; d < 7; ++d)
+        {
+            const int r = degree (d);
+            auto& c = set.chords[(size_t) ChordPresets::whitePcs[(size_t) d]];
+            c.root = (keyPc + r) % 12;
+            c.quality = qualityFor (degree (d + 2) - r, degree (d + 4) - r, degree (d + 6) - r, (degree (d + 8) - r) % 12);
+            c.notes = Voicing::make (c.root, c.quality, true, 62, nullptr);
+            c.name = Voicing::name (c.root, c.quality);
+        }
+        ChordPresets::fillBlackKeys (set, "STCSD");
+        return set;
+    }
+}
+
+ChordSet transposeSet (const ChordSet& set, int semitones)
+{
+    semitones = ((semitones % 12) + 12) % 12;
+    if (semitones > 6) semitones -= 12; // move the shortest way
+    if (semitones == 0) return set;
+    ChordSet out = set;
+    if (set.tonic >= 0) out.tonic = (set.tonic + semitones + 12) % 12;
+    for (auto& c : out.chords)
+    {
+        if (c.root >= 0 && c.quality >= 0)
+        {
+            c.root = (c.root + semitones + 12) % 12;
+            c.notes = Voicing::make (c.root, c.quality, true, 62, nullptr);
+            c.name = Voicing::name (c.root, c.quality);
+        }
+        else
+        {
+            for (auto& n : c.notes) n += semitones;
+            c = [&] { auto id = Voicing::identify (c.notes); id.notes = c.notes; return id; }();
+        }
+    }
+    return out;
 }

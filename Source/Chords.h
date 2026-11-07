@@ -59,8 +59,19 @@ namespace Voicing
 struct ChordSet
 {
     juce::String name;
+    int tonic = -1;   // key the set is written in (pitch class), -1 if unknown
     std::array<Chord, 12> chords;
 };
+
+// Lush diatonic chords built from a key and scale (white keys = degrees I-VII)
+namespace ScaleChords
+{
+    juce::StringArray scaleNames();
+    ChordSet make (int keyPc, int scaleIndex);
+}
+
+// Moves a whole chord set by some semitones (roots, names and voicings)
+ChordSet transposeSet (const ChordSet& set, int semitones);
 
 namespace ChordPresets
 {

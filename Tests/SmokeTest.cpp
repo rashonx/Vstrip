@@ -54,7 +54,7 @@ int main()
         set (p, "chordSet", (float) s);
         for (int pc = 0; pc < 12; ++pc)
         {
-            const auto c = p.chordForKey (pc);
+            const auto c = p.chordForKey (pc, 0);
             ++total;
             const bool ok = c.notes.size() >= 4 && c.name.isNotEmpty()
                          && std::all_of (c.notes.begin(), c.notes.end(), [] (int n) { return n >= 24 && n <= 100; });
@@ -71,7 +71,7 @@ int main()
     for (auto [ext, label] : { std::pair { 1, "7th" }, { 2, "9th" }, { 3, "11th" } })
     {
         set (p, "extensions", (float) ext);
-        const auto c = p.chordForKey (0);
+        const auto c = p.chordForKey (0, 0);
         const bool ok = (ext == 1 && (c.name.endsWith ("7") || c.name.contains ("7("))) || (ext == 2 && c.name.contains ("9")) || (ext == 3 && c.name.contains ("11"));
         check (ok, juce::String ("extensions ") + label, c.name);
     }
@@ -81,7 +81,7 @@ int main()
     set (p, "chordSet", 0.0f);
     for (size_t s = 0; s < soundPresets().size(); ++s)
     {
-        p.applySoundPreset ((int) s);
+        p.applySoundPreset (0, (int) s);
         bool finite = true;
         const float peak = play (p, 60 + (int) s % 12, 1.0f, finite);
         play (p, 0, 0.6f, finite); // let it ring out
@@ -147,12 +147,62 @@ int main()
         for (int n : { 50, 53, 57, 60 }) { seq.addEvent (juce::MidiMessage::noteOn (1, n, 0.8f), 0); seq.addEvent (juce::MidiMessage::noteOff (1, n), 1900); }
         seq.updateMatchedPairs();
         juce::MidiFile mf; mf.setTicksPerQuarterNote (960); mf.addTrack (seq);
-        p.setUserChords (ChordExtractor::fromMidi (mf, "save test").set);
+        p.setUserChords (0, ChordExtractor::fromMidi (mf, "save test").set);
         juce::MemoryBlock state;
         p.getStateInformation (state);
         SoulKeysProcessor q;
         q.setStateInformation (state.getData(), (int) state.getSize());
-        check (q.hasUserChords() && q.chordForKey (0).name == p.chordForKey (0).name, "file chords saved with the project", q.chordForKey (0).name);
+        check (q.hasUserChords (0) && q.chordForKey (0, 0).name == p.chordForKey (0, 0).name, "file chords saved with the project", q.chordForKey (0, 0).name);
+    }
+
+    // 7. Key: move preset 1 (written in Eb) to C
+    {
+        SoulKeysProcessor k;
+        set (k, "chordSet", 0.0f);
+        set (k, "key", 1.0f); // index 1 = C
+        check (k.chordForKey (0, 0).name == "Cmaj9", "key change moves the chord set", k.chordForKey (0, 0).name);
+    }
+
+    // 8. Key & Scale chords
+    {
+        SoulKeysProcessor k;
+        set (k, "chordSet", (float) SoulKeysProcessor::scaleSlot);
+        set (k, "key", 1.0f);   // C
+        set (k, "scale", 0.0f); // Major
+        juce::StringArray major;
+        for (int pc : ChordPresets::whitePcs) major.add (k.chordForKey (pc, 0).name);
+        check (major.joinIntoString (" ") == "Cmaj9 Dm9 Em7 Fmaj9 G9 Am9 Bm7(b5)", "C major scale chords", major.joinIntoString (" "));
+        set (k, "key", 10.0f);  // A
+        set (k, "scale", 1.0f); // Minor
+        juce::StringArray minor;
+        for (int pc : ChordPresets::whitePcs) minor.add (k.chordForKey (pc, 0).name);
+        check (minor[0] == "Am9" && minor[3] == "Dm9", "A minor scale chords", minor.joinIntoString (" "));
+        set (k, "extensions", 3.0f);
+        check (k.chordForKey (0, 0).name == "Am11", "scale chords follow the 11th switch", k.chordForKey (0, 0).name);
+    }
+
+    // 9. Split mode: low keys use zone A, high keys zone B, same register, and both sound
+    {
+        SoulKeysProcessor k;
+        k.setRateAndBufferSizeDetails (48000.0, 512);
+        k.prepareToPlay (48000.0, 512);
+        set (k, "split", 1.0f);
+        set (k, "splitPoint", 60.0f);
+        set (k, "chordSet", 0.0f);
+        set (k, "chordSetB", 1.0f);
+        check (k.zoneOf (48) == 0 && k.zoneOf (60) == 1 && k.zoneOf (72) == 1, "split point sends keys to the right zone");
+        const auto a = k.chordForKey (0, 0), b = k.chordForKey (0, 1);
+        check (a.name != b.name, "zones play different chord sets", a.name + " / " + b.name);
+        k.applySoundPreset (1, 7); // zone B: tape piano
+        bool finite = true;
+        const float peakA = play (k, 48, 0.6f, finite);
+        const float peakB = play (k, 72, 0.6f, finite);
+        check (finite && peakA > 0.02f && peakB > 0.02f, "both zones make sound", juce::String (peakA, 3) + " / " + juce::String (peakB, 3));
+        const auto before = k.chordForKey (0, 0).name;
+        k.swapZones();
+        check (k.chordForKey (0, 1).name == before, "swap A / B", k.chordForKey (0, 1).name);
+        set (k, "split", 0.0f);
+        check (k.zoneOf (72) == 0, "split off: every key uses zone A");
     }
 
     std::printf (failures == 0 ? "PASS\n" : "FAIL (%d)\n", failures);

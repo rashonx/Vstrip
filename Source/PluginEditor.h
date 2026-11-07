@@ -2,30 +2,54 @@
 
 #include <juce_audio_utils/juce_audio_utils.h>
 #include "PluginProcessor.h"
+#include "KeysSkins.h"
 
 class KeysLookAndFeel : public juce::LookAndFeel_V4
 {
 public:
-    KeysLookAndFeel();
+    void setSkin (const KeysSkin& s);
+    const KeysSkin& skin() const { return *current; }
     void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos, float a0, float a1, juce::Slider&) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour&, bool highlighted, bool down) override;
+
+private:
+    const KeysSkin* current = &KeysSkin::all().front();
 };
 
 // One octave drawn large, with the chord each key plays written on it.
 class ChordMapView : public juce::Component
 {
 public:
-    explicit ChordMapView (SoulKeysProcessor& p) : processor (p) {}
+    ChordMapView (SoulKeysProcessor& p, int zoneIndex) : processor (p), zone (zoneIndex) {}
+    void setSkin (const KeysSkin& s) { skin = &s; repaint(); }
     void refresh();
     void paint (juce::Graphics&) override;
 
 private:
     SoulKeysProcessor& processor;
-    std::array<juce::String, 12> names;
-    std::array<juce::String, 12> noteText;
+    const int zone;
+    const KeysSkin* skin = &KeysSkin::all().front();
+    std::array<juce::String, 12> names, noteText;
     std::array<bool, 12> held {};
     int last = -1;
+};
+
+// The playable keyboard, tinted to show which keys belong to zone A and zone B.
+class ZoneKeyboard : public juce::MidiKeyboardComponent
+{
+public:
+    ZoneKeyboard (juce::MidiKeyboardState& s, SoulKeysProcessor& p) : MidiKeyboardComponent (s, horizontalKeyboard), processor (p) {}
+    void setSkin (const KeysSkin& s) { skin = &s; repaint(); }
+
+protected:
+    void drawWhiteNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour lineColour, juce::Colour textColour) override;
+    void drawBlackNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour noteFillColour) override;
+
+private:
+    juce::Colour zoneColour (int note) const;
+    SoulKeysProcessor& processor;
+    const KeysSkin* skin = &KeysSkin::all().front();
 };
 
 class SoulKeysEditor : public juce::AudioProcessorEditor,
@@ -36,45 +60,82 @@ public:
     explicit SoulKeysEditor (SoulKeysProcessor&);
     ~SoulKeysEditor() override;
 
+    void setSkin (int index);
     void paint (juce::Graphics&) override;
+    void paintOverChildren (juce::Graphics&) override;
     void resized() override;
 
     bool isInterestedInFileDrag (const juce::StringArray& files) override;
-    void filesDropped (const juce::StringArray& files, int, int) override;
-    void loadChordsFrom (const juce::File& file);
+    void filesDropped (const juce::StringArray& files, int x, int y) override;
+    void loadChordsFrom (const juce::File& file, int zone);
 
 private:
+    using SA = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using CA = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
+    using BA = juce::AudioProcessorValueTreeState::ButtonAttachment;
+
+    struct ZoneRow
+    {
+        juce::Label title;
+        juce::Label setCaption, keyCaption, scaleCaption, extCaption, octCaption;
+        juce::ComboBox setBox, keyBox, scaleBox;
+        juce::TextButton prev { "<" }, next { ">" }, octDown { "-" }, octUp { "+" }, load { "FROM FILE..." };
+        juce::Label octValue;
+        juce::OwnedArray<juce::TextButton> ext;
+        std::unique_ptr<CA> setAtt, keyAtt, scaleAtt;
+        std::unique_ptr<ChordMapView> map;
+        juce::Rectangle<int> area;
+        int listed = -1;
+        bool listedUser = false;
+    };
+
     struct Knob
     {
         juce::Slider slider;
         juce::Label label;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        std::unique_ptr<SA> attachment;
+        const char* base = "";
     };
-    Knob* makeKnob (const char* id, const char* name);
+
+    void buildZoneRow (int zone);
+    void layoutZoneRow (int zone, int y);
+    void refreshSetList (int zone, bool force);
+    void bindSoundKnobs();
+    void setParam (const juce::String& id, float value);
     void timerCallback() override;
-    void refreshChordSetList();
-    void setChoice (const char* id, int index);
-    void drawPanel (juce::Graphics&, juce::Rectangle<int> r, const juce::String& title);
+    void applySkinColours();
+    void drawPanel (juce::Graphics&, juce::Rectangle<int> r, const juce::String& title, juce::Colour stripe);
 
     SoulKeysProcessor& processor;
     KeysLookAndFeel lnf;
-    ChordMapView chordMap;
-    juce::MidiKeyboardComponent keyboard;
+    std::array<ZoneRow, SoulKeysProcessor::numZones> rows;
+    ZoneKeyboard keyboard;
+    std::unique_ptr<juce::PropertiesFile> settings;
 
-    juce::ComboBox chordSetBox, soundBox;
-    juce::TextButton prevSet { "<" }, nextSet { ">" }, prevSound { "<" }, nextSound { ">" };
-    juce::TextButton loadButton { "PULL CHORDS FROM FILE..." };
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> chordSetAttachment;
-    juce::OwnedArray<juce::TextButton> extButtons, strumButtons;
+    // Header and split bar
+    juce::ComboBox skinBox, splitBox;
+    juce::Label skinCaption, splitCaption, splitAtCaption, splitHint;
+    juce::ToggleButton splitToggle;
+    std::unique_ptr<BA> splitAtt;
+    juce::TextButton swapButton { "SWAP A / B" };
+
+    // Sound panel (shows zone A or B)
+    juce::TextButton soundTabA { "ZONE A SOUND" }, soundTabB { "ZONE B SOUND" };
+    juce::ComboBox soundBox;
+    juce::TextButton prevSound { "<" }, nextSound { ">" };
+    juce::OwnedArray<Knob> soundKnobs;
+    int soundZone = 0;
+
+    // Play panel
+    juce::OwnedArray<Knob> playKnobs;
+    juce::OwnedArray<juce::TextButton> strumButtons;
     juce::ToggleButton bassToggle, leadingToggle, chordModeToggle;
-    juce::Label bassLabel, leadingLabel, chordModeLabel, extLabel, strumLabel, setLabel, soundLabel, status;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> bassAtt, leadingAtt, chordModeAtt;
+    juce::Label strumLabel, bassLabel, leadingLabel, chordModeLabel, status;
+    std::unique_ptr<BA> bassAtt, leadingAtt, chordModeAtt;
 
-    juce::OwnedArray<Knob> knobs;
-    std::vector<std::pair<juce::Rectangle<int>, juce::String>> panels;
+    std::vector<std::tuple<juce::Rectangle<int>, juce::String, bool>> panels; // area, title, uses zone B colour
     std::unique_ptr<juce::FileChooser> chooser;
-    int listedSets = -1;
-    bool listedHasUser = false;
+    int skinIndex = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SoulKeysEditor)
 };
