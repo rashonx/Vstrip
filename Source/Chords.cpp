@@ -1,0 +1,307 @@
+#include "Chords.h"
+#include <algorithm>
+#include <numeric>
+#include <set>
+#include <cstring>
+
+namespace ChordQ
+{
+    const Info& info (int q)
+    {
+        static const std::vector<Info> table {
+            { "maj7",      { 4, 7, 11 },          major,    true  },
+            { "maj9",      { 4, 7, 11, 14 },      major,    true  },
+            { "maj9(#11)", { 4, 11, 14, 18 },     major,    true  },
+            { "6/9",       { 4, 7, 9, 14 },       major,    true  },
+            { "m7",        { 3, 7, 10 },          minor,    true  },
+            { "m9",        { 3, 7, 10, 14 },      minor,    true  },
+            { "m11",       { 3, 10, 14, 17 },     minor,    true  },
+            { "m6/9",      { 3, 7, 9, 14 },       minor,    true  },
+            { "m(maj9)",   { 3, 7, 11, 14 },      minor,    true  },
+            { "7",         { 4, 7, 10 },          dominant, true  },
+            { "9",         { 4, 10, 14 },         dominant, true  },
+            { "13",        { 4, 10, 14, 21 },     dominant, true  },
+            { "7(#9)",     { 4, 10, 15 },         dominant, true  },
+            { "13(b9)",    { 4, 10, 13, 21 },     dominant, true  },
+            { "7alt",      { 4, 10, 15, 20 },     dominant, false },
+            { "9(#11)",    { 4, 10, 14, 18 },     dominant, true  },
+            { "11",        { 7, 10, 14, 17 },     dominant, true  },
+            { "7sus4",     { 5, 7, 10 },          sus,      true  },
+            { "9sus4",     { 5, 10, 14 },         sus,      true  },
+            { "13sus4",    { 5, 10, 14, 21 },     sus,      true  },
+            { "m7(b5)",    { 3, 6, 10 },          halfDim,  false },
+            { "m9(b5)",    { 3, 6, 10, 14 },      halfDim,  false },
+            { "m11(b5)",   { 3, 6, 10, 14, 17 },  halfDim,  false },
+            { "dim7",      { 3, 6, 9 },           dim,      false },
+            { "add9",      { 4, 7, 14 },          major,    true  },
+            { "maj7(#5)",  { 4, 8, 11 },          major,    false },
+        };
+        return table[(size_t) juce::jlimit (0, (int) table.size() - 1, q)];
+    }
+
+    int atLevel (int q, int level)
+    {
+        const int l = level <= 7 ? 0 : level <= 9 ? 1 : 2;
+        switch (info (q).family)
+        {
+            case major:    return std::array<int, 3> { M7, M9, M9s11 }[(size_t) l];
+            case minor:    return std::array<int, 3> { m7, m9, m11 }[(size_t) l];
+            case dominant: return std::array<int, 3> { d7, d9, d11 }[(size_t) l];
+            case sus:      return std::array<int, 3> { sus7, sus9, d11 }[(size_t) l];
+            case halfDim:  return std::array<int, 3> { m7b5, h9, m11b5 }[(size_t) l];
+            case dim:
+            default:       return dim7;
+        }
+    }
+
+    juce::String noteName (int pc)
+    {
+        static const char* names[] { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" };
+        return names[((pc % 12) + 12) % 12];
+    }
+}
+
+namespace Voicing
+{
+    std::vector<int> make (int root, int quality, bool includeBass, int centre, const std::vector<int>* previousUpper, int bassLow)
+    {
+        const auto& q = ChordQ::info (quality);
+        std::vector<int> pcs;
+        for (int iv : q.upper)
+            pcs.push_back ((root + iv) % 12);
+
+        // Try every rotation of the upper structure, stacked upwards; keep the best one
+        std::vector<int> best;
+        float bestScore = 1.0e9f;
+        for (size_t r = 0; r < pcs.size(); ++r)
+        {
+            for (int startOct = 3; startOct <= 6; ++startOct)
+            {
+                std::vector<int> v;
+                int note = startOct * 12 + pcs[r];
+                v.push_back (note);
+                for (size_t k = 1; k < pcs.size(); ++k)
+                {
+                    int next = (note / 12) * 12 + pcs[(r + k) % pcs.size()];
+                    while (next <= note) next += 12;
+                    v.push_back (next);
+                    note = next;
+                }
+                const float mean = (float) std::accumulate (v.begin(), v.end(), 0) / (float) v.size();
+                float score = std::abs (mean - (float) centre) + 0.15f * (float) (v.back() - v.front());
+                if (previousUpper != nullptr && ! previousUpper->empty())
+                {
+                    // Smallest total movement from the previous chord
+                    float move = 0.0f;
+                    for (int n : v)
+                    {
+                        int nearest = 99;
+                        for (int p : *previousUpper)
+                            nearest = std::min (nearest, std::abs (n - p));
+                        move += (float) nearest;
+                    }
+                    score = move + 0.35f * std::abs (mean - (float) centre);
+                }
+                if (v.front() < centre - 14 || v.back() > centre + 20)
+                    score += 50.0f;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = v;
+                }
+            }
+        }
+
+        std::vector<int> notes;
+        if (includeBass)
+        {
+            const int bass = bassLow + root % 12; // C2 .. B2 by default
+            notes.push_back (bass);
+            // A fifth above the bass fills out chords that have a natural fifth
+            if (q.naturalFifth && std::find (pcs.begin(), pcs.end(), (root + 7) % 12) == pcs.end())
+                notes.push_back (bass + 7);
+        }
+        notes.insert (notes.end(), best.begin(), best.end());
+        return notes;
+    }
+
+    juce::String name (int root, int quality, int bassPc)
+    {
+        auto n = ChordQ::noteName (root) + ChordQ::info (quality).suffix;
+        if (bassPc >= 0 && bassPc % 12 != root % 12)
+            n += "/" + ChordQ::noteName (bassPc);
+        return n;
+    }
+
+    Chord identify (const std::vector<int>& notesIn)
+    {
+        Chord c;
+        if (notesIn.empty())
+            return c;
+        auto notes = notesIn;
+        std::sort (notes.begin(), notes.end());
+        c.notes = notes;
+        std::set<int> pcs;
+        for (int n : notes) pcs.insert (n % 12);
+        const int bass = notes.front() % 12;
+
+        float bestScore = -1.0e9f;
+        for (int r : pcs)
+        {
+            std::set<int> rel;
+            for (int p : pcs) rel.insert ((p - r + 12) % 12);
+            for (int q = 0; q < ChordQ::numQualities; ++q)
+            {
+                const auto& info = ChordQ::info (q);
+                std::set<int> want { 0 };
+                for (int iv : info.upper) want.insert (iv % 12);
+                if (info.naturalFifth) want.insert (7);
+                int matched = 0, missing = 0, extra = 0;
+                for (int w : want)
+                    if (rel.count (w)) ++matched;
+                    else if (w != 7) ++missing;
+                for (int x : rel)
+                    if (! want.count (x)) ++extra;
+                const float score = 2.0f * (float) matched - 1.5f * (float) missing - 2.0f * (float) extra
+                                  + (r == bass ? 1.5f : 0.0f) - 0.05f * (float) want.size();
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    c.root = r;
+                    c.quality = q;
+                }
+            }
+        }
+
+        if (pcs.size() < 3 || bestScore < 2.0f)
+        {
+            // Not a recognisable chord: name it by its notes
+            juce::StringArray parts;
+            for (int p : pcs) parts.add (ChordQ::noteName (p));
+            c.name = parts.joinIntoString ("-");
+            c.root = -1;
+            c.quality = -1;
+        }
+        else
+            c.name = name (c.root, c.quality, bass);
+        return c;
+    }
+}
+
+namespace ChordPresets
+{
+    using namespace ChordQ;
+
+    struct Palette
+    {
+        const char* name;
+        int tonic;
+        std::array<std::pair<int, int>, 7> chords; // (semitones above tonic, quality) for C D E F G A B
+        const char* flavours;                       // C# D# F# G# A#
+    };
+
+    // Original progressions in a neo soul / R&B style: extended minors, sus dominants,
+    // gospel passing chords and chromatic slides.
+    const std::vector<Palette>& palettes()
+    {
+        static const std::vector<Palette> list {
+            { "Velvet Sunday",        3,  {{ {0,M9}, {2,m9}, {4,m7}, {5,M9s11}, {7,sus13}, {9,m11}, {10,d9} }}, "SDTSC" },
+            { "Smoke & Honey",        10, {{ {0,m11}, {3,M9}, {5,m9}, {7,d7s9}, {8,M9s11}, {10,sus9}, {2,h9} }}, "TSCDS" },
+            { "Late Night Groove",    2,  {{ {0,m9}, {5,d13}, {10,M9}, {3,M9s11}, {7,m11}, {8,d9s11}, {9,d7s9} }}, "SCTSU" },
+            { "Golden Hour Gospel",   8,  {{ {0,M69}, {5,M9}, {9,m9}, {2,m11}, {7,sus13}, {4,m7}, {7,d13b9} }}, "DSDSU" },
+            { "Rainy Window",         9,  {{ {0,m9}, {8,M9s11}, {5,M9}, {3,h9}, {7,d7alt}, {10,M7s5}, {2,m11} }}, "CTSDC" },
+            { "Soulful Strut",        5,  {{ {0,m11}, {10,d9}, {3,M9}, {8,M9s11}, {7,d7s9}, {5,m9}, {0,mM9} }}, "SCSTC" },
+            { "Sunday Choir",         1,  {{ {0,M9}, {5,M69}, {6,dim7}, {10,m9}, {3,m11}, {7,sus13}, {8,M9} }}, "DSDUS" },
+            { "Midnight Drive",       4,  {{ {0,m9}, {3,M9s11}, {5,m11}, {10,d13}, {8,M9}, {1,h9}, {6,d7alt} }}, "TCSTS" },
+            { "Silk Sheets",          6,  {{ {0,M9}, {11,M9s11}, {4,m9}, {9,d13}, {2,M9}, {8,m11}, {1,sus13} }}, "CSTCU" },
+            { "Cocoa Butter",         11, {{ {0,m9}, {5,d9}, {10,m11}, {3,M9}, {8,M69}, {1,h9}, {6,d13b9} }}, "SSCTS" },
+            { "Front Porch Hymn",     7,  {{ {0,M69}, {4,m7}, {5,M9}, {6,dim7}, {7,add9}, {9,m9}, {2,sus9} }}, "DSDUS" },
+            { "Neon Lounge",          0,  {{ {0,m9}, {2,h9}, {3,M9}, {5,m11}, {7,d7alt}, {8,M9s11}, {10,d13} }}, "TSCTS" },
+            { "Hazy Morning",         5,  {{ {0,M9}, {2,m11}, {4,m9}, {7,sus13}, {9,m7}, {10,M9s11}, {7,d13} }}, "CSDCS" },
+            { "Bedroom Session",      3,  {{ {0,m9}, {5,d9}, {8,M9}, {7,d7s9}, {10,sus9}, {1,M9s11}, {2,h9} }}, "SCTSD" },
+            { "Liquid Groove",        9,  {{ {0,m11}, {2,m9}, {5,M9}, {7,d13}, {3,h9}, {8,d7s9}, {10,M9s11} }}, "CCSTS" },
+            { "Church Clap",          10, {{ {0,M9}, {4,dim7}, {5,M69}, {9,m9}, {2,m11}, {7,d13b9}, {7,sus13} }}, "DSDSU" },
+            { "Velour Slow Jam",      8,  {{ {0,M9}, {7,m11}, {5,M9s11}, {2,m9}, {10,sus13}, {3,m9}, {1,M9} }}, "SCTSC" },
+            { "Coffee Shop Poet",     2,  {{ {0,M9}, {4,m9}, {9,m11}, {5,M9s11}, {7,d9}, {11,m7}, {10,d13} }}, "SDSCT" },
+            { "Burgundy",             1,  {{ {0,m11}, {3,m9}, {8,M9}, {5,M9s11}, {10,d7s9}, {6,M69}, {7,h9} }}, "TSCSD" },
+            { "Slow Burn",            7,  {{ {0,m9}, {5,m11}, {10,d13}, {3,M9}, {8,M7s5}, {2,d7alt}, {0,mM9} }}, "SCTSS" },
+            { "Lavender Haze",        4,  {{ {0,M9s11}, {2,M9}, {9,m9}, {11,m11}, {4,m7}, {5,M9}, {7,sus13} }}, "CTCSU" },
+            { "Brownstone Steps",     5,  {{ {0,m9}, {3,d13}, {8,M9}, {1,M9s11}, {7,d7s9}, {10,m11}, {5,sus9} }}, "STCST" },
+            { "Altar Call",           3,  {{ {0,M69}, {5,M9}, {7,sus13}, {9,m9}, {4,dim7}, {2,m11}, {7,d13b9} }}, "DUSDS" },
+            { "Moonlit Boulevard",    11, {{ {0,M9}, {3,m11}, {6,d13}, {8,m9}, {10,M9s11}, {1,sus13}, {4,m7} }}, "SCTSC" },
+            { "Velvet Rope",          6,  {{ {0,m9}, {2,M9s11}, {5,m11}, {7,d7alt}, {9,M9}, {10,d9s11}, {3,h9} }}, "TSCTS" },
+            { "Honey Drip",           10, {{ {0,M9}, {9,m11}, {2,m9}, {7,d13}, {5,M9s11}, {4,h9}, {3,m69} }}, "SCSTD" },
+            { "Sanctified Groove",    8,  {{ {0,d9}, {5,d9}, {7,d7s9}, {3,m11}, {10,sus13}, {0,d13}, {6,M9} }}, "CSTCS" },
+            { "Quiet Storm",          2,  {{ {0,m9}, {10,M9}, {8,M9s11}, {7,d13b9}, {5,m11}, {3,M9}, {1,d7alt} }}, "SCDTS" },
+            { "Stoop Kids",           0,  {{ {0,M9}, {9,m9}, {2,m11}, {7,d9}, {4,m7}, {5,M69}, {8,d9s11} }}, "SDSCT" },
+            { "After Hours Bar",      9,  {{ {0,m69}, {5,m9}, {7,d7alt}, {10,M9}, {3,h9}, {8,M9s11}, {2,d13} }}, "TSCSS" },
+            { "Mahogany",             3,  {{ {0,m11}, {8,M9}, {10,d13}, {5,m9}, {1,M9s11}, {7,d7s9}, {3,M7s5} }}, "SCTSC" },
+            { "Soft Landing",         5,  {{ {0,add9}, {5,M9}, {9,m11}, {2,m9}, {7,sus9}, {4,m7}, {10,M69} }}, "SUDSC" },
+            { "Crushed Velvet",       6,  {{ {0,m9}, {10,m11}, {8,M9s11}, {1,d13}, {3,M9}, {5,d7s9}, {11,sus13} }}, "CTSCS" },
+            { "Uptown Prayer",        1,  {{ {0,M9}, {6,dim7}, {5,m9}, {10,m11}, {3,m9}, {8,sus13}, {8,d13b9} }}, "DSDSU" },
+            { "Rooftop Summer",       7,  {{ {0,M9}, {2,m9}, {5,M9s11}, {4,m11}, {9,m9}, {10,d9}, {7,M69} }}, "CSTSD" },
+            { "Dimmer Switch",        4,  {{ {0,m9}, {7,d7alt}, {5,M9}, {3,h9}, {8,d7s9}, {1,m11}, {10,d9s11} }}, "TCSST" },
+            { "Sweet Tea",            10, {{ {0,M69}, {2,m11}, {5,M9}, {9,m7}, {7,d13}, {4,h9}, {3,M9s11} }}, "SDCSU" },
+            { "Indigo",               11, {{ {0,m11}, {5,d13}, {10,M9}, {3,M9s11}, {8,m9}, {1,h9}, {6,d7s9} }}, "SCTSS" },
+            { "Saturday Fish Fry",    5,  {{ {0,d9}, {5,d13}, {7,d7s9}, {10,d9}, {3,d13}, {8,M9}, {2,m11} }}, "CSTCS" },
+            { "Candlelight",          8,  {{ {0,M9}, {10,m11}, {3,m9}, {5,M9s11}, {7,sus13}, {1,M9}, {9,dim7} }}, "SCTDU" },
+            { "Blue Note Stoop",      2,  {{ {0,m69}, {2,h9}, {7,d7alt}, {5,M9}, {10,M9s11}, {3,d13}, {0,mM9} }}, "TSCTS" },
+            { "Champagne Room",       3,  {{ {0,M9s11}, {7,m9}, {2,m11}, {5,M9}, {10,d13}, {8,M69}, {1,d9s11} }}, "CTSCS" },
+            { "Grandma's Piano",      7,  {{ {0,M69}, {5,add9}, {7,sus9}, {9,m7}, {4,m9}, {2,m11}, {6,dim7} }}, "DUSDS" },
+            { "Fade to Grey",         9,  {{ {0,m11}, {3,M9s11}, {5,m9}, {10,d13}, {8,M7s5}, {7,d7alt}, {2,h9} }}, "SCTSD" },
+            { "Cruise Control",       0,  {{ {0,M9}, {4,m11}, {9,m9}, {2,d13}, {5,M9s11}, {7,sus13}, {10,M9} }}, "SCSTC" },
+            { "Plum Wine",            1,  {{ {0,m9}, {8,M9}, {6,d13}, {11,M9s11}, {3,m11}, {10,d7s9}, {5,h9} }}, "TSCSS" },
+            { "Testimony",            10, {{ {0,M9}, {5,M69}, {6,dim7}, {7,m11}, {2,m9}, {9,d13b9}, {4,sus13} }}, "DSDSU" },
+            { "Lo-Fi Lover",          4,  {{ {0,M9}, {9,m9}, {5,M9s11}, {7,d9}, {2,m11}, {11,d7s9}, {3,M7s5} }}, "CSTSC" },
+            { "Velvet Underpass",     6,  {{ {0,m11}, {5,m9}, {10,d7alt}, {3,M9}, {8,M9s11}, {1,d13}, {11,h9} }}, "STCST" },
+            { "Last Call",            8,  {{ {0,M9}, {2,m11}, {7,sus13}, {7,d13b9}, {9,m9}, {5,M9s11}, {4,M69} }}, "SDSCU" },
+        };
+        return list;
+    }
+
+    int count() { return (int) palettes().size(); }
+
+    void fillBlackKeys (ChordSet& set, const char* flavours)
+    {
+        // Each black key leads into the white key just above it
+        static constexpr std::array<int, 5> targetWhite { 1, 2, 4, 5, 6 };
+        for (size_t i = 0; i < blackPcs.size(); ++i)
+        {
+            const auto& target = set.chords[(size_t) whitePcs[(size_t) targetWhite[i]]];
+            const int tRoot = target.root >= 0 ? target.root : (target.notes.empty() ? 0 : target.notes.front() % 12);
+            const int tQual = target.quality >= 0 ? target.quality : ChordQ::m9;
+            int root = 0, quality = d13b9;
+            switch (flavours != nullptr && std::strlen (flavours) > i ? flavours[i] : 'S')
+            {
+                case 'T': root = (tRoot + 1) % 12;  quality = d9s11; break;
+                case 'C': root = (tRoot + 1) % 12;  quality = tQual; break;
+                case 'D': root = (tRoot + 11) % 12; quality = dim7;  break;
+                case 'U': root = (tRoot + 7) % 12;  quality = sus13; break;
+                case 'S':
+                default:  root = (tRoot + 7) % 12;  quality = d13b9; break;
+            }
+            auto& c = set.chords[(size_t) blackPcs[i]];
+            c.root = root;
+            c.quality = quality;
+            c.notes = Voicing::make (root, quality, true, 62, nullptr);
+            c.name = Voicing::name (root, quality);
+        }
+    }
+
+    ChordSet get (int index)
+    {
+        const auto& p = palettes()[(size_t) juce::jlimit (0, count() - 1, index)];
+        ChordSet set;
+        set.name = juce::String (index + 1).paddedLeft ('0', 2) + "  " + p.name + "  (" + ChordQ::noteName (p.tonic) + ")";
+        for (size_t i = 0; i < 7; ++i)
+        {
+            auto& c = set.chords[(size_t) whitePcs[i]];
+            c.root = (p.tonic + p.chords[i].first) % 12;
+            c.quality = p.chords[i].second;
+            c.notes = Voicing::make (c.root, c.quality, true, 62, nullptr);
+            c.name = Voicing::name (c.root, c.quality);
+        }
+        fillBlackKeys (set, p.flavours);
+        return set;
+    }
+}

@@ -1,0 +1,25 @@
+Rashon Soul Keys - install on Windows
+=====================================
+
+1. Copy the "Rashon Soul Keys.vst3" folder to:
+       C:\Program Files\Common Files\VST3\
+2. Rescan plugins in your DAW and load Rashon Soul Keys as an INSTRUMENT on a MIDI/instrument track.
+
+How to play
+-----------
+- Every WHITE key plays one lush chord from the chosen chord set, in any octave.
+- Every BLACK key plays a related chord that leads into the white key just above it
+  (secondary dominants, tritone subs, gospel passing diminished chords, chromatic slides).
+- CHORD SET: 50 presets. Use < > to flip through them.
+- EXTENSIONS: Preset (as designed), or force every chord to 7th, 9th or 11th.
+- SOUND: 6 Rhodes-style electric pianos and 4 tape pianos. Picking one also sets the knobs.
+- PLAY: Strum (roll the chord), Humanize, Octave, Bass note, Voice leading (smooth moves
+  between chords), Chord mode (turn off to play single notes).
+
+Pull chords from your own files
+-------------------------------
+Click "PULL CHORDS FROM FILE..." or drag a file onto the plugin window.
+- MIDI files: the exact chords are read.
+- Audio files (WAV, AIFF, FLAC, MP3, OGG): the chords are detected and made lush (major -> maj9,
+  minor -> m9, dominant -> 9). Works best on clear piano or guitar chords; busy full mixes are harder.
+The first 7 chords go on the white keys, the next 5 on the black keys. They are saved with your project.

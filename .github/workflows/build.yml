@@ -1,0 +1,48 @@
+name: Build plugin
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure
+        run: cmake -B build -A x64
+
+      - name: Build
+        run: cmake --build build --config Release --target SoulKeys_VST3 SoulKeys_Standalone
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item -Recurse "build/SoulKeys_artefacts/Release/VST3/Rashon Soul Keys.vst3" dist/
+          Copy-Item "build/SoulKeys_artefacts/Release/Standalone/Rashon Soul Keys.exe" dist/
+          Copy-Item docs/INSTALL.txt dist/
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: echo "number=$(grep -oP 'project\(RashonSoulKeys VERSION \K[0-9.]+' CMakeLists.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RashonSoulKeys-Windows-v${{ steps.version.outputs.number }}
+          path: dist/
+
+  linux-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxcomposite-dev libxi-dev libxext-dev libfreetype-dev libfontconfig1-dev ninja-build
+      - name: Build and run smoke test
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSOULKEYS_BUILD_TESTS=ON
+          cmake --build build --target SoulKeysSmokeTest
+          ./build/SoulKeysSmokeTest
