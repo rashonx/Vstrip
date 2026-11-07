@@ -1,4 +1,4 @@
-// Runs vocal + beat through the plugin and checks carving, level matching and stability.
+// Runs a beat (main input) and vocal (sidechain) through the plugin and checks the carving.
 #include "../Source/PluginProcessor.h"
 
 namespace
@@ -6,7 +6,7 @@ namespace
     int failures = 0;
     void check (bool ok, const char* what, float value)
     {
-        std::printf ("%s %-46s %8.2f\n", ok ? "  ok  " : "  FAIL", what, value);
+        std::printf ("%s %-50s %8.2f\n", ok ? "  ok  " : "  FAIL", what, value);
         if (! ok) ++failures;
     }
 
@@ -16,48 +16,59 @@ namespace
         param->setValueNotifyingHost (param->convertTo0to1 (value));
     }
 
-    // Plays `seconds` of audio; vocal and beat are generator functions of time.
-    // Returns the RMS of input (vocal + beat) and output over the last second.
-    template <typename V, typename B>
-    std::pair<float, float> run (VocalSitterProcessor& p, double rate, float seconds, V vocal, B beat)
+    struct Result { float inRms, outRms, maxDiff; };
+
+    // beatL/beatR/vocal are generator functions of time. Measures the last second.
+    template <typename L, typename R, typename V>
+    Result run (VocalSitterProcessor& p, double rate, float seconds, L beatL, R beatR, V vocal)
     {
         const int block = 480;
         juce::AudioBuffer<float> buf (4, block);
         juce::MidiBuffer midi;
         const int blocks = (int) (seconds * rate) / block;
         double inSum = 0, outSum = 0;
+        float maxDiff = 0.0f;
         long count = 0;
         bool finite = true;
         for (int b = 0; b < blocks; ++b)
         {
+            float inL[480], inR[480];
             for (int i = 0; i < block; ++i)
             {
                 const double t = (double) (b * block + i) / rate;
-                const float v = vocal (t), m = beat (t);
-                buf.setSample (0, i, v); buf.setSample (1, i, v);
-                buf.setSample (2, i, m); buf.setSample (3, i, m);
-                if (b >= blocks - (int) rate / block) inSum += (double) ((v + m) * (v + m));
+                inL[i] = beatL (t); inR[i] = beatR (t);
+                buf.setSample (0, i, inL[i]); buf.setSample (1, i, inR[i]);
+                buf.setSample (2, i, vocal (t)); buf.setSample (3, i, vocal (t));
             }
             p.processBlock (buf, midi);
+            const bool measure = b >= blocks - (int) rate / block;
             for (int i = 0; i < block; ++i)
             {
-                const float o = buf.getSample (0, i);
-                finite = finite && std::isfinite (o);
-                if (b >= blocks - (int) rate / block) { outSum += (double) (o * o); ++count; }
+                const float oL = buf.getSample (0, i), oR = buf.getSample (1, i);
+                finite = finite && std::isfinite (oL) && std::isfinite (oR);
+                if (measure)
+                {
+                    inSum += (double) (inL[i] * inL[i] + inR[i] * inR[i]);
+                    outSum += (double) (oL * oL + oR * oR);
+                    maxDiff = juce::jmax (maxDiff, std::abs (oL - inL[i]), std::abs (oR - inR[i]));
+                    count += 2;
+                }
             }
         }
         check (finite, "output is finite", 0.0f);
-        return { (float) std::sqrt (inSum / (double) count), (float) std::sqrt (outSum / (double) count) };
+        return { (float) std::sqrt (inSum / (double) count), (float) std::sqrt (outSum / (double) count), maxDiff };
     }
 
-    float displayReductionAt (const VocalSitterProcessor& p, float hz)
+    float cutNear (const VocalSitterProcessor& p, float hz)
     {
         int best = 0;
-        for (int i = 0; i < CarveDisplayData::numPoints; ++i)
-            if (std::abs (std::log (CarveDisplayData::frequencyForPoint (i) / hz)) < std::abs (std::log (CarveDisplayData::frequencyForPoint (best) / hz)))
-                best = i;
-        return p.getDisplay().reductionDb[(size_t) best].load();
+        for (int b = 0; b < BandCarver::numBands; ++b)
+            if (std::abs (std::log (BandCarver::bandFrequency (b) / hz)) < std::abs (std::log (BandCarver::bandFrequency (best) / hz)))
+                best = b;
+        return p.getDisplay().cutDb[(size_t) best].load();
     }
+
+    float db (float ratio) { return juce::Decibels::gainToDecibels (ratio); }
 }
 
 int main()
@@ -65,56 +76,75 @@ int main()
     juce::ScopedJuceInitialiser_GUI init;
     const auto twoPi = juce::MathConstants<double>::twoPi;
     auto silence = [] (double) { return 0.0f; };
-    auto vocalTone = [&] (double t) { return 0.3f * (float) std::sin (twoPi * 1000.0 * t); };
-    auto beatTones = [&] (double t) { return 0.2f * (float) (std::sin (twoPi * 200.0 * t) + std::sin (twoPi * 1000.0 * t)); };
+    auto tone1k = [&] (double t) { return 0.3f * (float) std::sin (twoPi * 1000.0 * t); };
+    auto beat = [&] (double t) { return 0.2f * (float) (std::sin (twoPi * 200.0 * t) + std::sin (twoPi * 1000.0 * t)); };
+    auto beatOnly1k = [&] (double t) { return 0.3f * (float) std::sin (twoPi * 1000.0 * t); };
+    auto beatOnly200 = [&] (double t) { return 0.3f * (float) std::sin (twoPi * 200.0 * t); };
+    auto sideOnlyR = [&] (double t) { return -0.3f * (float) std::sin (twoPi * 1000.0 * t); };
 
-    for (double rate : { 44100.0, 48000.0 })
+    for (double rate : { 44100.0, 48000.0, 96000.0 })
     {
         std::printf ("%.0f Hz\n", rate);
         VocalSitterProcessor p;
         p.setRateAndBufferSizeDetails (rate, 480);
         p.prepareToPlay (rate, 480);
-        check (p.getLatencySamples() == SpectralCarver::getLatency(), "reports latency (samples)", (float) p.getLatencySamples());
+        check (p.getLatencySamples() == 0, "zero latency (samples)", (float) p.getLatencySamples());
 
-        // 1. With no carving and auto gain off, the beat passes through untouched
-        set (p, "autoGain", 0.0f);
-        set (p, "carveAmount", 0.0f);
-        auto [in1, out1] = run (p, rate, 2.0f, silence, beatTones);
-        const float passDb = juce::Decibels::gainToDecibels (out1 / in1);
-        check (std::abs (passDb) < 0.3f, "beat passes unchanged at 0% carve (dB)", passDb);
+        // 1. Silent vocal: beat passes through untouched (filters are exactly flat at 0 dB)
+        auto r1 = run (p, rate, 1.0f, beat, beat, silence);
+        check (r1.maxDiff < 1.0e-4f, "silent vocal leaves the beat untouched (max diff)", r1.maxDiff);
 
-        // 2. Full carve: the 1 kHz part of the beat is cut, 200 Hz is left alone
-        set (p, "carveAmount", 100.0f);
-        set (p, "carveLow", 400.0f);
-        run (p, rate, 2.0f, vocalTone, beatTones);
-        const float at1k = displayReductionAt (p, 1000.0f), at200 = displayReductionAt (p, 200.0f);
-        check (at1k < -12.0f, "carve depth at 1 kHz, where the vocal is (dB)", at1k);
-        check (at200 > -1.0f, "carve depth at 200 Hz, below Low Cut (dB)", at200);
+        // 2. Amount 0 with a vocal: still untouched
+        set (p, "amount", 0.0f);
+        auto r2 = run (p, rate, 1.0f, beat, beat, tone1k);
+        check (r2.maxDiff < 1.0e-4f, "0% amount leaves the beat untouched (max diff)", r2.maxDiff);
 
-        // 3. Auto gain keeps the output level matched to the input
+        // 3. Full amount: the beat's 1 kHz is cut, its 200 Hz is not
+        set (p, "amount", 100.0f);
+        auto r3a = run (p, rate, 1.0f, beatOnly1k, beatOnly1k, tone1k);
+        auto r3b = run (p, rate, 1.0f, beatOnly200, beatOnly200, tone1k);
+        check (db (r3a.outRms / r3a.inRms) < -12.0f, "beat at 1 kHz cut where vocal is (dB)", db (r3a.outRms / r3a.inRms));
+        check (db (r3b.outRms / r3b.inRms) > -1.5f, "beat at 200 Hz mostly untouched (dB)", db (r3b.outRms / r3b.inRms));
+        check (cutNear (p, 1000.0f) < -12.0f, "display shows the cut at 1 kHz (dB)", cutNear (p, 1000.0f));
+
+        // 4. Low Cut above the vocal: no carving
+        set (p, "lowCut", 2000.0f);
+        auto r4 = run (p, rate, 1.0f, beatOnly1k, beatOnly1k, tone1k);
+        check (db (r4.outRms / r4.inRms) > -1.0f, "nothing carved below Low Cut (dB)", db (r4.outRms / r4.inRms));
+        set (p, "lowCut", 20.0f);
+
+        // 5. Mid mode leaves a side-only beat alone; Side mode carves it
+        set (p, "stereo", 1.0f);
+        auto r5 = run (p, rate, 1.0f, beatOnly1k, sideOnlyR, tone1k);
+        check (db (r5.outRms / r5.inRms) > -0.5f, "Mid mode ignores side-only beat (dB)", db (r5.outRms / r5.inRms));
+        set (p, "stereo", 2.0f);
+        auto r6 = run (p, rate, 1.0f, beatOnly1k, sideOnlyR, tone1k);
+        check (db (r6.outRms / r6.inRms) < -12.0f, "Side mode carves side-only beat (dB)", db (r6.outRms / r6.inRms));
+        set (p, "stereo", 0.0f);
+
+        // 6. Auto gain brings the carved beat back to its input level
         set (p, "autoGain", 1.0f);
-        set (p, "vocalLevel", -6.0f);
-        auto [in3, out3] = run (p, rate, 4.0f, vocalTone, beatTones);
-        const float matchDb = juce::Decibels::gainToDecibels (out3 / in3);
-        check (std::abs (matchDb) < 1.0f, "auto gain output vs input level (dB)", matchDb);
+        auto r7 = run (p, rate, 4.0f, beat, beat, tone1k);
+        check (std::abs (db (r7.outRms / r7.inRms)) < 1.0f, "auto gain matches input level (dB)", db (r7.outRms / r7.inRms));
+        set (p, "autoGain", 0.0f);
 
-        // 4. Vocal only, sidechain switched off
+        // 7. No sidechain connected
         auto layout = p.getBusesLayout();
         layout.inputBuses.getReference (1) = juce::AudioChannelSet::disabled();
         p.setBusesLayout (layout);
         p.prepareToPlay (rate, 480);
-        auto [in4, out4] = run (p, rate, 1.0f, vocalTone, silence);
-        check (out4 > 0.01f, "works with no sidechain connected (RMS)", out4);
+        auto r8 = run (p, rate, 1.0f, beat, beat, silence);
+        check (r8.maxDiff < 1.0e-4f, "works with no sidechain connected (max diff)", r8.maxDiff);
     }
 
-    // Settings survive save and reload
     VocalSitterProcessor a, b;
-    set (a, "carveAmount", 73.0f);
+    set (a, "amount", 73.0f);
+    set (a, "stereo", 2.0f);
     juce::MemoryBlock state;
     a.getStateInformation (state);
     b.setStateInformation (state.getData(), (int) state.getSize());
-    const float restored = b.apvts.getRawParameterValue ("carveAmount")->load();
-    check (std::abs (restored - 73.0f) < 0.6f, "settings restore", restored);
+    check (std::abs (b.apvts.getRawParameterValue ("amount")->load() - 73.0f) < 0.6f, "settings restore (amount)", b.apvts.getRawParameterValue ("amount")->load());
+    check (juce::roundToInt (b.apvts.getRawParameterValue ("stereo")->load()) == 2, "settings restore (stereo mode)", b.apvts.getRawParameterValue ("stereo")->load());
 
     std::printf (failures == 0 ? "PASS\n" : "FAIL (%d)\n", failures);
     return failures == 0 ? 0 : 1;

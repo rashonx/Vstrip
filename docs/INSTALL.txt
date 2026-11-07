@@ -7,16 +7,24 @@ Rashon Vocal Sitter - install on Windows
 
 How to set it up (FL Studio)
 ----------------------------
-1. Put Rashon Vocal Sitter on your VOCAL mixer track.
-2. Select your BEAT mixer track. Right-click the little arrow at the bottom of the
-   vocal track and choose "Sidechain to this track". Also turn OFF the beat track's
-   send to Master (click the arrow under the beat track pointing to Master).
-3. In the plugin wrapper (gear icon) > Processing tab, set the sidechain input
-   to the beat's track number.
-4. You should now see the beat in blue on the display. Turn up CARVE AMOUNT.
+1. Put Rashon Vocal Sitter on your BEAT mixer track (or the bus your music goes to).
+2. Select your VOCAL mixer track. Right-click the little arrow at the bottom of the
+   beat track and choose "Sidechain to this track". The vocal keeps playing normally
+   through its own track.
+3. Open the plugin wrapper (gear icon) > Processing tab and set the sidechain input
+   to the vocal's track number.
+4. Play the song. You'll see the vocal as gold marks on the display. Turn up AMOUNT
+   until the vocal sits on top of the beat.
 
-Because the beat now plays through the plugin (Beat to output = ON), the vocal
-track outputs the vocal plus the carved beat together.
+Other DAWs: put the plugin on the beat track and pick the vocal as its sidechain input.
 
-Other DAWs: put the plugin on the vocal track, pick the beat as its sidechain
-input, and mute the beat's normal output.
+Controls
+--------
+AMOUNT     How much space to carve out of the beat (up to 24 dB per band)
+ATTACK     How fast the beat ducks when the vocal comes in
+RELEASE    How fast the beat comes back when the vocal stops
+LOW CUT    Don't carve below this frequency (keep your bass and kick)
+HIGH CUT   Don't carve above this frequency
+STEREO/MID/SIDE   Carve the whole beat, only its centre, or only its sides
+AUTO GAIN  Keeps the beat as loud as it was before carving
+OUTPUT     Final level

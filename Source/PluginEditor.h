@@ -8,12 +8,11 @@ class KnobLookAndFeel : public juce::LookAndFeel_V4
 public:
     void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos,
                            float startAngle, float endAngle, juce::Slider&) override;
-    void drawLinearSlider (juce::Graphics&, int x, int y, int w, int h, float pos, float minPos, float maxPos,
-                           juce::Slider::SliderStyle, juce::Slider&) override;
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
+    void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour&, bool highlighted, bool down) override;
 };
 
-// Live picture of the beat (sidechain), the vocal, and what is being carved out of the beat.
+// 32 bars: the beat's level per band, the part being carved out (red), and the vocal (gold).
 class CarveView : public juce::Component
 {
 public:
@@ -23,9 +22,9 @@ public:
 
 private:
     VocalSitterProcessor& processor;
-    static constexpr int numPoints = CarveDisplayData::numPoints;
-    std::array<float, numPoints> beatIn {}, beatOut {}, vocal {}, reduction {};
-    bool hasSidechain = false;
+    static constexpr int numBands = CarveDisplayData::numBands;
+    std::array<float, numBands> beat {}, vocal {}, cut {};
+    bool hasVocal = false;
 };
 
 class VocalSitterEditor : public juce::AudioProcessorEditor, private juce::Timer
@@ -44,33 +43,26 @@ private:
         juce::Label label;
         std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
     };
-    struct Switch
-    {
-        juce::ToggleButton button;
-        juce::Label label;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attachment;
-    };
 
-    Control* makeKnob (const juce::String& id, const juce::String& name, juce::Colour accent, bool rotary = true);
-    Switch* makeSwitch (const juce::String& id, const juce::String& name, juce::Colour accent);
+    Control* makeKnob (const juce::String& id, const juce::String& name, juce::Colour accent);
     void timerCallback() override;
+    void setStereoMode (int index);
     void drawPanel (juce::Graphics&, juce::Rectangle<int> area, const juce::String& title, juce::Colour accent);
     void drawMeter (juce::Graphics&, juce::Rectangle<float> area, const juce::String& name, float valueDb, juce::Colour colour);
-    void drawEqCurve (juce::Graphics&, juce::Rectangle<float> area);
 
     VocalSitterProcessor& processor;
     KnobLookAndFeel lnf;
     CarveView carveView;
 
     juce::OwnedArray<Control> controls;
-    juce::OwnedArray<Switch> switches;
-    Control *amount = nullptr, *lowCut = nullptr, *highCut = nullptr, *release = nullptr;
-    Control *vocalLevel = nullptr, *beatLevel = nullptr, *output = nullptr;
-    std::array<Control*, VocalEq::numBands> eqFaders {};
-    Switch *beatToOutput = nullptr, *autoGain = nullptr;
+    Control *amount = nullptr, *attack = nullptr, *release = nullptr, *lowCut = nullptr, *highCut = nullptr, *output = nullptr;
+    juce::OwnedArray<juce::TextButton> stereoButtons;
+    juce::Label stereoLabel, autoGainLabel;
+    juce::ToggleButton autoGainButton;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> autoGainAttachment;
 
-    juce::Rectangle<int> carvePanel, eqPanel, mixPanel, eqCurveArea, meterArea;
-    float vocalDb = -100.0f, beatDb = -100.0f, outDb = -100.0f, autoDb = 0.0f;
+    juce::Rectangle<int> carvePanel, outputPanel, meterArea;
+    float beatDb = -100.0f, vocalDb = -100.0f, outDb = -100.0f, autoDb = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VocalSitterEditor)
 };

@@ -31,7 +31,7 @@ juce_add_plugin(VocalSitter
 juce_add_binary_data(SitterAssets SOURCES Assets/dodge_city_logo.png)
 
 target_sources(VocalSitter PRIVATE
-  Source/SpectralCarver.cpp
+  Source/BandCarver.cpp
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp)
 

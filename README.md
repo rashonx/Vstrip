@@ -7,27 +7,24 @@ blends them back together, level-matched. Built with [JUCE](https://juce.com).
 
 ## How it works
 
-Put it on the **vocal** track and feed the **beat** into its sidechain input. Many times a
-second it looks at which frequencies the vocal is using and turns the beat down only at
-those frequencies, only while the vocal is there. The output is the vocal plus the carved beat.
+Works like a track spacer: put it on the **beat** track and feed the **vocal** into its
+sidechain input. A bank of 32 filters across the spectrum dips the beat in each band by
+how loud the vocal is in that band, as it happens. Zero latency. The output is the
+carved beat; the vocal stays on its own track.
 
 ## Controls
 
-| Section | Control | What it does |
-|---|---|---|
-| Carve | **Carve Amount** | How much of the beat gets carved out (0–100%, up to 18 dB) |
-| | Low Cut / High Cut | Only carve between these frequencies |
-| | Release | How fast the beat comes back after the vocal stops |
-| Vocal EQ | 7 faders | 63 Hz, 160 Hz, 400 Hz, 1 kHz, 2.5 kHz, 6.3 kHz, 16 kHz (±12 dB) |
-| Mix | Vocal / Beat | Balance between vocal and beat |
-| | Beat to output | Include the carved beat in the output |
-| | Auto gain | Keeps the output as loud as the input, so carving and EQ don't change the level |
-| | Output | Final level |
+| Control | What it does |
+|---|---|
+| **Amount** | How much space to carve out of the beat (up to 24 dB per band) |
+| Attack / Release | How fast the beat ducks and comes back |
+| Low Cut / High Cut | Only carve between these frequencies |
+| Stereo / Mid / Side | Carve the whole beat, only its centre, or only its sides |
+| Auto gain | Keeps the beat as loud as it was before carving |
+| Output | Final level |
 
-The display shows the beat (blue), what's being carved out (red), the vocal (gold), and the
-carve depth across the frequency range. Areas outside Low Cut / High Cut are dimmed.
-
-The plugin adds 2048 samples (~43 ms) of latency, which your DAW compensates automatically.
+The display shows 32 bars: the beat's level in each band (blue), the part being carved
+out (red), and the vocal (gold marks), plus the carve depth per band along the bottom.
 
 ## Getting the plugin
 
@@ -47,8 +44,8 @@ Tests (Linux/macOS): `cmake -B build -DSITTER_BUILD_TESTS=ON && cmake --build bu
 
 ## Code layout
 
-- `Source/SpectralCarver.*` - the FFT carving engine
-- `Source/PluginProcessor.*` - signal flow, vocal EQ, mix, auto gain, parameters
+- `Source/BandCarver.*` - the 32-band zero-latency carving engine
+- `Source/PluginProcessor.*` - signal flow, auto gain, parameters
 - `Source/PluginEditor.*` - the window and live carve display
 - `Source/Artwork.h` - 3D title and studio mic drawing
 - `Tests/` - audio smoke test and screenshot tool

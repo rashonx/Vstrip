@@ -11,7 +11,7 @@ int main (int argc, char** argv)
     VocalSitterProcessor proc;
     proc.setRateAndBufferSizeDetails (rate, block);
     proc.prepareToPlay (rate, block);
-    for (auto [id, v] : { std::pair { "carveAmount", 0.75f }, { "eq2", 0.40f }, { "eq4", 0.65f }, { "eq5", 0.6f }, { "eq6", 0.62f } })
+    for (auto [id, v] : { std::pair { "amount", 0.8f }, { "release", 0.5f } })
         proc.apvts.getParameter (id)->setValueNotifyingHost (v);
 
     std::unique_ptr<juce::AudioProcessorEditor> editor (proc.createEditor());
@@ -56,8 +56,8 @@ int main (int argc, char** argv)
                                   + 0.05 * (std::sin (twoPi * 330.0 * s) + std::sin (twoPi * 415.0 * s) + std::sin (twoPi * 494.0 * s));
                 for (int ch = 0; ch < 2; ++ch)
                 {
-                    buf.setSample (ch, i, (float) (0.25 * v));
-                    buf.setSample (ch + 2, i, (float) beat);
+                    buf.setSample (ch, i, (float) beat);
+                    buf.setSample (ch + 2, i, (float) (0.25 * v));
                 }
             }
             proc.processBlock (buf, midi);

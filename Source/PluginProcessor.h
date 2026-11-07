@@ -2,16 +2,10 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
-#include "SpectralCarver.h"
+#include "BandCarver.h"
 
-// The 7-band graphic EQ for the vocal
-struct VocalEq
-{
-    static constexpr int numBands = 7;
-    static constexpr std::array<float, numBands> frequencies { 63.0f, 160.0f, 400.0f, 1000.0f, 2500.0f, 6300.0f, 16000.0f };
-    static std::array<float, 6> coefficients (int band, float gainDb, double sampleRate);
-};
-
+// Goes on the BEAT track. The vocal feeds the sidechain; the output is the beat
+// with space carved out wherever the vocal is.
 class VocalSitterProcessor : public juce::AudioProcessor
 {
 public:
@@ -46,27 +40,17 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     const CarveDisplayData& getDisplay() const { return carver.display; }
-    double getCurrentSampleRate() const { return sr; }
 
     // Values read by the editor's meters
-    std::atomic<float> vocalLevelDb { -100.0f }, beatLevelDb { -100.0f }, outputLevelDb { -100.0f }, autoGainDb { 0.0f };
+    std::atomic<float> beatLevelDb { -100.0f }, vocalLevelDb { -100.0f }, outputLevelDb { -100.0f }, autoGainDb { 0.0f };
 
 private:
     float param (const juce::String& id) const { return apvts.getRawParameterValue (id)->load(); }
-    void updateEq();
-
-    using Filter = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>>;
 
     double sr = 44100.0;
-    std::array<Filter, VocalEq::numBands> eq;
-    std::array<float, VocalEq::numBands> lastEqGains {};
-    SpectralCarver carver;
-
-    juce::AudioBuffer<float> beatBuffer, vocalDelay;
+    BandCarver carver;
     std::vector<float> vocalKey;
-    int delayPos = 0;
-
-    juce::SmoothedValue<float> vocalGain, beatGain, outGain, autoGain;
+    juce::SmoothedValue<float> outGain, autoGain;
     float refPower = 0.0f, outPower = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VocalSitterProcessor)
