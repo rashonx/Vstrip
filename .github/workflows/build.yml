@@ -25,8 +25,10 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          Copy-Item SETUP.txt dist/
+          $v = "${{ steps.version.outputs.number }}"
           Get-ChildItem dist -Filter *.pdb | Remove-Item
+          Rename-Item dist/WheelBridge.exe "WheelBridge v$v.exe"
+          Copy-Item SETUP.txt "dist/SETUP v$v.txt"
 
       - uses: actions/upload-artifact@v4
         with:

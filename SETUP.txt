@@ -11,7 +11,7 @@ ONE-TIME SETUP
 4. In Moza Pit House, note your wheel rotation (for example 900 or 540).
 
 EVERY TIME YOU PLAY
-1. Open WheelBridge.exe.
+1. Open "WheelBridge vX.Y.Z.exe" (the number is the version; delete older copies).
    - Windows may say "Windows protected your PC" because the app isn't signed.
      Click "More info" then "Run anyway".
    - Keep your feet off the pedals while it starts (it calibrates their resting position).
