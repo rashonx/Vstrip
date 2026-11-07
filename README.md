@@ -30,7 +30,7 @@ Every push to GitHub builds the plugin automatically:
 
 ## Building yourself
 
-Needs CMake 3.22+ and Visual Studio 2022 (with "Desktop development with C++"). JUCE is downloaded automatically.
+Needs CMake 3.22+ and Visual Studio 2022 or newer (with "Desktop development with C++"). JUCE is downloaded automatically.
 
 ```bash
 cmake -B build
