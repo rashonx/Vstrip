@@ -21,13 +21,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Copy-Item -Recurse build/VocalStrip_artefacts/Release/VST3/VocalStrip.vst3 dist/
-          Copy-Item build/VocalStrip_artefacts/Release/Standalone/VocalStrip.exe dist/
+          Copy-Item -Recurse "build/VocalStrip_artefacts/Release/VST3/Rashon X Vocal.vst3" dist/
+          Copy-Item "build/VocalStrip_artefacts/Release/Standalone/Rashon X Vocal.exe" dist/
           Copy-Item docs/INSTALL.txt dist/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: VocalStrip-Windows
+          name: RashonXVocal-Windows
           path: dist/
 
   linux-test:

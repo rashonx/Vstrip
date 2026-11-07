@@ -52,6 +52,7 @@ private:
     KnobLookAndFeel lnf;
     juce::OwnedArray<Section> sections;
     std::vector<std::vector<int>> rows;
+    float metersLeft = 0.0f;
     float inDb = -100.0f, outDb = -100.0f, compGr = 0.0f, deEssGr = 0.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VocalStripEditor)

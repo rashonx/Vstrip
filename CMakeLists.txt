@@ -16,8 +16,8 @@ FetchContent_Declare(JUCE
 FetchContent_MakeAvailable(JUCE)
 
 juce_add_plugin(VocalStrip
-  COMPANY_NAME "VocalStrip"
-  PRODUCT_NAME "VocalStrip"
+  COMPANY_NAME "Rashon X"
+  PRODUCT_NAME "Rashon X Vocal"
   PLUGIN_MANUFACTURER_CODE Vstr
   PLUGIN_CODE Vcs1
   FORMATS VST3 Standalone

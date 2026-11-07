@@ -1,8 +1,8 @@
-# VocalStrip
+# Rashon X Vocal
 
 An all-in-one vocal channel strip plugin (VST3 for Windows), built with [JUCE](https://juce.com).
 
-![VocalStrip](docs/screenshot.png)
+![Rashon X Vocal](docs/screenshot.png)
 
 ## Signal chain
 
@@ -25,8 +25,8 @@ Meters at the top show input level, de-esser and compressor gain reduction, and 
 Every push to GitHub builds the plugin automatically:
 
 1. Open the repo's **Actions** tab and click the latest **Build plugin** run.
-2. Download **VocalStrip-Windows** under *Artifacts* and unzip it.
-3. Follow `INSTALL.txt` (copy `VocalStrip.vst3` to `C:\Program Files\Common Files\VST3\`).
+2. Download **RashonXVocal-Windows** under *Artifacts* and unzip it.
+3. Follow `INSTALL.txt` (copy `Rashon X Vocal.vst3` to `C:\Program Files\Common Files\VST3\`).
 
 ## Building yourself
 
@@ -37,7 +37,7 @@ cmake -B build
 cmake --build build --config Release
 ```
 
-The plugin ends up in `build/VocalStrip_artefacts/Release/VST3/`.
+The plugin ends up in `build/VocalStrip_artefacts/Release/VST3/` (as `Rashon X Vocal.vst3`).
 
 Run the audio smoke test (Linux or macOS):
 
