@@ -31,7 +31,7 @@ public:
     bool hasEditor() const override { return true; }
     const juce::String getName() const override { return JucePlugin_Name; }
     bool acceptsMidi() const override { return true; }
-    bool producesMidi() const override { return false; }
+    bool producesMidi() const override { return true; }
     bool isMidiEffect() const override { return false; }
     double getTailLengthSeconds() const override { return 4.0; }
     int getNumPrograms() override { return 1; }
@@ -43,7 +43,13 @@ public:
     void setStateInformation (const void* data, int sizeInBytes) override;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createLayout();
+    juce::UndoManager undoManager;            // must be created before apvts
     juce::AudioProcessorValueTreeState apvts;
+
+    // Compare: two complete setups to flip between
+    int compareSlot() const { return activeSlot; }
+    void switchCompare (int slot);
+    void copyCompareSlot();                   // current setup -> the other slot
     juce::MidiKeyboardState keyboardState;
 
     // Parameter id for a zone: zone A uses the plain id, zone B adds "B"
@@ -115,6 +121,9 @@ private:
     void emitDue (int numSamples);
 
     std::array<Zone, numZones> zones;
+    std::array<juce::ValueTree, 2> compareSlots;
+    int activeSlot = 0;
+    juce::MidiBuffer midiOut;
     std::vector<ChordSet> library;
 
     std::atomic<bool> recording { false };

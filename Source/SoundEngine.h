@@ -69,6 +69,7 @@ struct FxSettings
 {
     float tone = 0.7f, tremRate = 4.5f, tremDepth = 0.0f, chorus = 0.0f;
     float wobble = 0.0f, age = 0.0f, hiss = 0.0f, reverb = 0.2f, volume = 0.0f;
+    bool notesActive = true; // hiss fades out when nothing is playing
 };
 
 // Tone, tremolo, chorus, tape (wow & flutter, saturation, hiss) and reverb
@@ -89,4 +90,5 @@ private:
     std::array<float, 2> ageLp {}, hissLp {};
     juce::Random rng;
     juce::SmoothedValue<float> gain;
+    float hissLevel = 0.0f;
 };

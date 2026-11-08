@@ -31,7 +31,8 @@ private:
     const int zone;
     const KeysSkin* skin = &KeysSkin::all().front();
     std::array<juce::String, 12> names, noteText;
-    std::array<bool, 12> held {};
+    std::array<bool, 12> held {}, suggested {};
+    juce::String suggestionText;
     int last = -1;
 };
 
@@ -67,7 +68,8 @@ private:
 
 class SoulKeysEditor : public juce::AudioProcessorEditor,
                        public juce::FileDragAndDropTarget,
-                       private juce::Timer
+                       private juce::Timer,
+                       private juce::ValueTree::Listener
 {
 public:
     explicit SoulKeysEditor (SoulKeysProcessor&);
@@ -117,6 +119,7 @@ private:
     void bindSoundKnobs();
     void setParam (const juce::String& id, float value);
     void timerCallback() override;
+    void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override { lastEdit = juce::Time::getMillisecondCounterHiRes(); editPending = true; }
     void applySkinColours();
     void drawPanel (juce::Graphics&, juce::Rectangle<int> r, const juce::String& title, juce::Colour stripe);
     void showStatus (const juce::String& text);
@@ -152,6 +155,20 @@ private:
     juce::ToggleButton bassToggle, leadingToggle, chordModeToggle;
     juce::Label strumLabel, bassLabel, leadingLabel, chordModeLabel, status;
     std::unique_ptr<BA> bassAtt, leadingAtt, chordModeAtt;
+
+    // Undo / redo and compare
+    juce::TextButton undoButton { "UNDO" }, redoButton { "REDO" }, compare1 { "1" }, compare2 { "2" }, copyCompare { "COPY 1 > 2" };
+    juce::Label compareCaption;
+    double lastEdit = 0.0;
+    bool editPending = false;
+
+    // Voicing & MIDI panel
+    juce::OwnedArray<juce::TextButton> voicingButtons;
+    juce::ComboBox topNoteBox, midiOutBox;
+    juce::ToggleButton suggestToggle;
+    juce::Label voicingCaption, topNoteCaption, suggestCaption, midiOutCaption, midiHint;
+    std::unique_ptr<CA> topNoteAtt, midiOutAtt;
+    std::unique_ptr<BA> suggestAtt;
 
     // Recorder
     juce::TextButton recButton { "REC" }, stopButton { "STOP" }, clearButton { "CLEAR" }, saveMidiButton { "SAVE MIDI..." };

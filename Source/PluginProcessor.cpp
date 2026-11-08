@@ -70,12 +70,16 @@ juce::AudioProcessorValueTreeState::ParameterLayout SoulKeysProcessor::createLay
     p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "bass", 1 }, "Bass Note", true));
     p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "voiceLeading", 1 }, "Voice Leading", true));
     p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "chordMode", 1 }, "Chord Mode", true));
+    p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "voicing", 1 }, "Voicing Style", StringArray { "Close", "Open", "Drop 2", "Rootless" }, 0));
+    p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "topNote", 1 }, "Top Note", StringArray { "Auto", "Root", "3rd", "5th", "7th", "9th", "11th", "13th" }, 0));
+    p.push_back (std::make_unique<AudioParameterBool> (ParameterID { "suggest", 1 }, "Next-Chord Suggestions", true));
+    p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { "midiOut", 1 }, "MIDI Output", StringArray { "Off", "Sound + MIDI", "MIDI only" }, 0));
     return { p.begin(), p.end() };
 }
 
 SoulKeysProcessor::SoulKeysProcessor()
     : AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::stereo(), true)),
-      apvts (*this, nullptr, "PARAMS", createLayout())
+      apvts (*this, &undoManager, "PARAMS", createLayout())
 {
     presetSets(); // build the 50 chord sets now, not on the audio thread
     reloadLibrary();
@@ -114,6 +118,7 @@ void SoulKeysProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
         z.scaleKey = z.scaleIndex = -1;
     }
     keyboardState.reset();
+    midiOut.ensureSize (8192);
     pending.clear();
     for (auto& v : notesFromKey) v.clear();
     blockStart = 0.0;
@@ -367,7 +372,8 @@ Chord SoulKeysProcessor::resolveChord (int key, int zoneIndex, std::vector<int>*
             if (std::abs (mean - (float) centre) < 9.0f)
                 prev = previousUpper;
         }
-        out.notes = Voicing::make (c.root, q, bass, centre, prev, 36 + juce::jlimit (-24, 24, shift));
+        out.notes = Voicing::make (c.root, q, bass, centre, prev, 36 + juce::jlimit (-24, 24, shift),
+                                   juce::roundToInt (param ("voicing")), juce::roundToInt (param ("topNote")));
         out.root = c.root;
         out.quality = q;
         out.name = Voicing::name (c.root, q);
@@ -531,18 +537,60 @@ void SoulKeysProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             }
     }
 
-    for (auto& z : zones)
+    // MIDI output: the chords go out as MIDI (zone A on channel 1, zone B on channel 2)
+    const int midiMode = juce::roundToInt (param ("midiOut"));
+    midiOut.clear();
+    if (midiMode > 0)
+        for (int zi = 0; zi < numZones; ++zi)
+            for (const auto meta : zones[(size_t) zi].midi)
+            {
+                auto m = meta.getMessage();
+                if (m.getChannel() > 0) m.setChannel (zi + 1);
+                midiOut.addEvent (m, meta.samplePosition);
+            }
+
+    for (int zi = 0; zi < numZones; ++zi)
     {
+        auto& z = zones[(size_t) zi];
+        if (midiMode == 2) // MIDI only: the internal sound stays silent
+        {
+            z.midi.clear();
+            continue;
+        }
+        bool active = false;
+        for (int v = 0; v < z.synth.getNumVoices(); ++v)
+            active = active || z.synth.getVoice (v)->isVoiceActive();
+        // Zone B is skipped completely while split mode is off and it has nothing ringing
+        if (zi == 1 && ! splitOn() && ! active && z.midi.isEmpty())
+            continue;
         z.buffer.clear (0, n);
         juce::AudioBuffer<float> view (z.buffer.getArrayOfWritePointers(), 2, n);
         z.synth.renderNextBlock (view, z.midi, 0, n);
         z.fxSettings = { param (z.p.tone), param (z.p.tremRate), param (z.p.tremDepth), param (z.p.chorus),
-                         param (z.p.wobble), param (z.p.age), param (z.p.hiss), param (z.p.reverb), param (z.p.volume) };
+                         param (z.p.wobble), param (z.p.age), param (z.p.hiss), param (z.p.reverb), param (z.p.volume),
+                         active || ! z.midi.isEmpty() };
         z.fx.process (view, z.fxSettings);
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.addFrom (ch, 0, view, ch, 0, n);
     }
+    midi.swapWith (midiOut);
     blockStart += n;
+}
+
+void SoulKeysProcessor::switchCompare (int slot)
+{
+    slot = juce::jlimit (0, 1, slot);
+    if (slot == activeSlot) return;
+    compareSlots[(size_t) activeSlot] = apvts.copyState();
+    if (! compareSlots[(size_t) slot].isValid())
+        compareSlots[(size_t) slot] = compareSlots[(size_t) activeSlot].createCopy();
+    apvts.replaceState (compareSlots[(size_t) slot].createCopy());
+    activeSlot = slot;
+}
+
+void SoulKeysProcessor::copyCompareSlot()
+{
+    compareSlots[(size_t) (1 - activeSlot)] = apvts.copyState();
 }
 
 //==============================================================================

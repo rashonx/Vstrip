@@ -3,10 +3,11 @@
 #include "ChordExtractor.h"
 #include "PresetFile.h"
 #include <BinaryData.h>
+#include <numeric>
 
 namespace
 {
-    constexpr int W = 1160, H = 920;
+    constexpr int W = 1160, H = 960;
 
     juce::Colour contrast (juce::Colour c) { return c.getPerceivedBrightness() > 0.55f ? juce::Colour (0xff111111) : juce::Colours::white; }
 }
@@ -101,6 +102,28 @@ void ChordMapView::refresh()
         held[(size_t) pc] = processor.keyHeld[zone][pc].load();
     }
     last = processor.lastKeyPc[zone].load();
+
+    // Next-chord suggestions: the 3 best-scoring keys after the last chord
+    suggested.fill (false);
+    suggestionText.clear();
+    if (last >= 0 && processor.apvts.getRawParameterValue ("suggest")->load() > 0.5f)
+    {
+        std::array<Chord, 12> options;
+        for (int pc = 0; pc < 12; ++pc) options[(size_t) pc] = processor.chordForKey (pc, zone);
+        const auto scores = Suggest::score (options[(size_t) last], options);
+        std::array<int, 12> order;
+        std::iota (order.begin(), order.end(), 0);
+        std::sort (order.begin(), order.end(), [&] (int a, int b) { return scores[(size_t) a] > scores[(size_t) b]; });
+        juce::StringArray tips;
+        for (int i = 0; i < 3; ++i)
+        {
+            const int k = order[(size_t) i];
+            if (scores[(size_t) k] < 0.5f) break;
+            suggested[(size_t) k] = true;
+            tips.add (names[(size_t) k] + " (" + ChordQ::noteName (k) + ")");
+        }
+        if (! tips.isEmpty()) suggestionText = "Try next: " + tips.joinIntoString (",  ");
+    }
     repaint();
 }
 
@@ -125,7 +148,13 @@ void ChordMapView::paint (juce::Graphics& g)
         g.drawFittedText (names[(size_t) last], now.reduced (12.0f).withTrimmedTop (22.0f).withHeight (50.0f).toNearestInt(), juce::Justification::centredLeft, 1);
         g.setColour (s.text);
         g.setFont (juce::FontOptions (11.0f));
-        g.drawFittedText (noteText[(size_t) last], now.reduced (12.0f).withTrimmedTop (76.0f).toNearestInt(), juce::Justification::topLeft, 3);
+        g.drawFittedText (noteText[(size_t) last], now.reduced (12.0f).withTrimmedTop (64.0f).withHeight (16.0f).toNearestInt(), juce::Justification::topLeft, 1);
+        if (suggestionText.isNotEmpty())
+        {
+            g.setColour (zoneColour.withAlpha (0.9f));
+            g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
+            g.drawFittedText (suggestionText, now.reduced (12.0f).withTrimmedTop (82.0f).toNearestInt(), juce::Justification::topLeft, 2);
+        }
     }
     else
     {
@@ -144,6 +173,13 @@ void ChordMapView::paint (juce::Graphics& g)
         const bool on = held[(size_t) pc];
         g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.4f) : s.whiteTop, 0.0f, r.getY(), on ? zoneColour : s.whiteBottom, 0.0f, r.getBottom(), false));
         g.fillRoundedRectangle (r, 6.0f);
+        if (suggested[(size_t) pc] && ! on)
+        {
+            g.setColour (zoneColour.withAlpha (0.35f));
+            g.fillRoundedRectangle (r.withTrimmedTop (r.getHeight() * 0.55f), 6.0f);
+            g.setColour (zoneColour);
+            g.drawRoundedRectangle (r.reduced (1.5f), 6.0f, 3.0f);
+        }
         g.setColour (on ? contrast (zoneColour) : s.whiteText);
         g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
         g.drawFittedText (names[(size_t) pc], r.reduced (5.0f).withTrimmedTop (r.getHeight() * 0.58f).toNearestInt(), juce::Justification::centredTop, 2);
@@ -160,6 +196,11 @@ void ChordMapView::paint (juce::Graphics& g)
         const bool on = held[(size_t) pc];
         g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.3f) : s.blackTop, 0.0f, r.getY(), on ? zoneColour : s.blackBottom, 0.0f, r.getBottom(), false));
         g.fillRoundedRectangle (r, 5.0f);
+        if (suggested[(size_t) pc] && ! on)
+        {
+            g.setColour (zoneColour);
+            g.drawRoundedRectangle (r.reduced (1.5f), 5.0f, 3.0f);
+        }
         g.setColour (on ? contrast (zoneColour) : s.blackText);
         g.setFont (juce::FontOptions (10.5f, juce::Font::bold));
         g.drawFittedText (names[(size_t) pc], r.reduced (3.0f).withTrimmedTop (r.getHeight() * 0.4f).toNearestInt(), juce::Justification::centredTop, 3);
@@ -325,6 +366,42 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
     bassAtt = std::make_unique<BA> (processor.apvts, "bass", bassToggle);
     leadingAtt = std::make_unique<BA> (processor.apvts, "voiceLeading", leadingToggle);
     chordModeAtt = std::make_unique<BA> (processor.apvts, "chordMode", chordModeToggle);
+    // Undo / redo and compare
+    undoButton.onClick = [this] { processor.undoManager.undo(); showStatus ("Undone."); };
+    redoButton.onClick = [this] { processor.undoManager.redo(); showStatus ("Redone."); };
+    caption (compareCaption, "COMPARE");
+    compare1.onClick = [this] { processor.switchCompare (0); refreshSetList (0, true); refreshSetList (1, true); bindSoundKnobs(); showStatus ("Compare: setup 1"); };
+    compare2.onClick = [this] { processor.switchCompare (1); refreshSetList (0, true); refreshSetList (1, true); bindSoundKnobs(); showStatus ("Compare: setup 2 (starts as a copy of setup 1)"); };
+    copyCompare.onClick = [this] { processor.copyCompareSlot(); showStatus ("Copied this setup into the other compare slot."); };
+    for (auto* b : std::initializer_list<juce::Component*> { &undoButton, &redoButton, &compare1, &compare2, &copyCompare })
+        addAndMakeVisible (b);
+    processor.apvts.state.addListener (this);
+
+    // Voicing & MIDI
+    caption (voicingCaption, "VOICING");
+    for (auto [i, t] : { std::pair { 0, "Close" }, { 1, "Open" }, { 2, "Drop 2" }, { 3, "Rootless" } })
+    {
+        auto* b = voicingButtons.add (new juce::TextButton (t));
+        b->onClick = [this, i = i] { setParam ("voicing", (float) i); };
+        addAndMakeVisible (b);
+    }
+    caption (topNoteCaption, "TOP NOTE");
+    topNoteBox.addItemList ({ "Auto", "Root", "3rd", "5th", "7th", "9th", "11th", "13th" }, 1);
+    topNoteAtt = std::make_unique<CA> (processor.apvts, "topNote", topNoteBox);
+    topNoteBox.setTooltip ("Which chord tone sits on top - use it to shape a melody across your chords");
+    addAndMakeVisible (topNoteBox);
+    caption (suggestCaption, "SUGGEST NEXT CHORD");
+    suggestAtt = std::make_unique<BA> (processor.apvts, "suggest", suggestToggle);
+    addAndMakeVisible (suggestToggle);
+    caption (midiOutCaption, "MIDI OUTPUT");
+    midiOutBox.addItemList ({ "Off", "Sound + MIDI", "MIDI only" }, 1);
+    midiOutAtt = std::make_unique<CA> (processor.apvts, "midiOut", midiOutBox);
+    midiOutBox.setTooltip ("Send the chords out as MIDI to play your own instruments");
+    addAndMakeVisible (midiOutBox);
+    midiHint.setFont (juce::FontOptions (11.0f));
+    midiHint.setText ("Zone A sends on MIDI channel 1, zone B on channel 2.\nIn your DAW, route this plugin's MIDI out to another instrument.", juce::dontSendNotification);
+    addAndMakeVisible (midiHint);
+
     // Recorder
     recCaption.setText ("RECORD WHAT YOU PLAY", juce::dontSendNotification);
     recCaption.setFont (juce::FontOptions (11.0f));
@@ -380,6 +457,7 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
 
 SoulKeysEditor::~SoulKeysEditor()
 {
+    processor.apvts.state.removeListener (this);
     setLookAndFeel (nullptr);
 }
 
@@ -646,7 +724,7 @@ void SoulKeysEditor::applySkinColours()
         r.octValue.setColour (juce::Label::textColourId, s.text);
     }
     keyboard.setSkin (s);
-    for (auto* l : { &skinCaption, &splitCaption, &splitAtCaption, &strumLabel, &bassLabel, &leadingLabel, &chordModeLabel, &recCaption, &takeInfo })
+    for (auto* l : { &skinCaption, &splitCaption, &splitAtCaption, &strumLabel, &bassLabel, &leadingLabel, &chordModeLabel, &recCaption, &takeInfo, &compareCaption, &voicingCaption, &topNoteCaption, &suggestCaption, &midiOutCaption, &midiHint })
         l->setColour (juce::Label::textColourId, s.dim);
     splitHint.setColour (juce::Label::textColourId, s.dim);
     status.setColour (juce::Label::textColourId, s.dim);
@@ -716,6 +794,21 @@ void SoulKeysEditor::loadChordsFrom (const juce::File& file, int zone)
 
 void SoulKeysEditor::timerCallback()
 {
+    // Group changes into undo steps: a new step after half a second without edits
+    if (editPending && juce::Time::getMillisecondCounterHiRes() - lastEdit > 500.0)
+    {
+        processor.undoManager.beginNewTransaction();
+        editPending = false;
+    }
+    undoButton.setEnabled (processor.undoManager.canUndo());
+    redoButton.setEnabled (processor.undoManager.canRedo());
+    compare1.setToggleState (processor.compareSlot() == 0, juce::dontSendNotification);
+    compare2.setToggleState (processor.compareSlot() == 1, juce::dontSendNotification);
+    copyCompare.setButtonText (processor.compareSlot() == 0 ? "COPY 1 > 2" : "COPY 2 > 1");
+    const int voicing = juce::roundToInt (processor.apvts.getRawParameterValue ("voicing")->load());
+    for (int i = 0; i < voicingButtons.size(); ++i)
+        voicingButtons[i]->setToggleState (i == voicing, juce::dontSendNotification);
+
     if (processor.isRecording())
     {
         processor.drainRecording (take);
@@ -865,7 +958,14 @@ void SoulKeysEditor::resized()
     splitAtCaption.setBounds (100, 88, 80, 14);
     splitBox.setBounds (100, 104, 80, 24);
     swapButton.setBounds (192, 104, 110, 24);
-    splitHint.setBounds (314, 104, W - 330, 24);
+    splitHint.setBounds (314, 96, 410, 36);
+    splitHint.setFont (juce::FontOptions (11.0f));
+    undoButton.setBounds (734, 104, 58, 24);
+    redoButton.setBounds (796, 104, 58, 24);
+    compareCaption.setBounds (870, 88, 80, 14);
+    compare1.setBounds (870, 104, 36, 24);
+    compare2.setBounds (910, 104, 36, 24);
+    copyCompare.setBounds (950, 104, 100, 24);
 
     layoutZoneRow (0, 140);
     layoutZoneRow (1, 330);
@@ -914,6 +1014,20 @@ void SoulKeysEditor::resized()
     saveMidiButton.setBounds (rx + 320, py + 42, 120, 28);
     takeInfo.setBounds (rx, py + 74, W - 24 - rx, 18);
 
-    keyboard.setBounds (12, py + ph + 8, W - 24, H - (py + ph + 8) - 8);
+    // Voicing & MIDI panel
+    const int vy = py + ph + 8, vh = 64;
+    panels.push_back ({ { 12, vy, W - 24, vh }, {}, false });
+    voicingCaption.setBounds (22, vy + 8, 100, 14);
+    for (int i = 0; i < voicingButtons.size(); ++i)
+        voicingButtons[i]->setBounds (22 + i * 72, vy + 26, 70, 26);
+    topNoteCaption.setBounds (322, vy + 8, 100, 14);
+    topNoteBox.setBounds (322, vy + 26, 100, 26);
+    suggestCaption.setBounds (440, vy + 8, 140, 14);
+    suggestToggle.setBounds (440, vy + 28, 56, 24);
+    midiOutCaption.setBounds (590, vy + 8, 120, 14);
+    midiOutBox.setBounds (590, vy + 26, 150, 26);
+    midiHint.setBounds (752, vy + 14, W - 24 - 752, 40);
+
+    keyboard.setBounds (12, vy + vh + 8, W - 24, H - (vy + vh + 8) - 8);
     keyboard.setKeyWidth ((float) (W - 24) / 36.0f);
 }

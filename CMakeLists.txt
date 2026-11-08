@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(RashonSoulKeys VERSION 1.2.0)
+project(RashonSoulKeys VERSION 1.3.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,7 +24,7 @@ juce_add_plugin(SoulKeys
   FORMATS VST3 Standalone
   IS_SYNTH TRUE
   NEEDS_MIDI_INPUT TRUE
-  NEEDS_MIDI_OUTPUT FALSE
+  NEEDS_MIDI_OUTPUT TRUE
   VST3_CATEGORIES Instrument Synth
   COPY_PLUGIN_AFTER_BUILD FALSE)
 

@@ -63,12 +63,50 @@ namespace ChordQ
 
 namespace Voicing
 {
-    std::vector<int> make (int root, int quality, bool includeBass, int centre, const std::vector<int>* previousUpper, int bassLow)
+    // Which interval above the root plays the role of a chord degree (3rd, 5th, ...), or -1
+    static int intervalForDegree (const ChordQ::Info& q, int degree)
+    {
+        auto has = [&] (std::initializer_list<int> options)
+        {
+            for (int o : options)
+                for (int iv : q.upper)
+                    if (iv % 12 == o % 12) return iv;
+            return -1;
+        };
+        switch (degree)
+        {
+            case 1: return 12;
+            case 2: { const int v = has ({ 4, 3, 5 }); return v >= 0 ? v : (q.family == ChordQ::minor || q.family == ChordQ::halfDim || q.family == ChordQ::dim ? 3 : 4); }
+            case 3: { const int v = has ({ 7, 6, 8 }); return v >= 0 ? v : 7; }
+            case 4: { const int v = has ({ 10, 11 }); return v >= 0 ? v : (q.family == ChordQ::major ? 11 : q.family == ChordQ::dim ? 9 : 10); }
+            case 5: { const int v = has ({ 14, 13, 15 }); return v >= 0 ? v : 14; }
+            case 6: { const int v = has ({ 17, 18 }); return v >= 0 ? v : (q.family == ChordQ::major || q.family == ChordQ::dominant ? 18 : 17); }
+            case 7: { const int v = has ({ 21, 20, 9 }); return v >= 0 ? v : 21; }
+            default: return -1;
+        }
+    }
+
+    std::vector<int> make (int root, int quality, bool includeBass, int centre, const std::vector<int>* previousUpper, int bassLow, int style, int topDegree)
     {
         const auto& q = ChordQ::info (quality);
         std::vector<int> pcs;
         for (int iv : q.upper)
             pcs.push_back ((root + iv) % 12);
+
+        // Top note: make sure that chord tone is in the voicing, then only accept voicings with it on top
+        int topPc = -1;
+        if (topDegree > 0)
+        {
+            const int iv = intervalForDegree (q, topDegree);
+            if (iv >= 0)
+            {
+                topPc = (root + iv) % 12;
+                if (std::find (pcs.begin(), pcs.end(), topPc) == pcs.end())
+                    pcs.push_back (topPc);
+            }
+        }
+        if (style == rootless)
+            includeBass = false;
 
         // Try every rotation of the upper structure, stacked upwards; keep the best one
         std::vector<int> best;
@@ -87,6 +125,8 @@ namespace Voicing
                     v.push_back (next);
                     note = next;
                 }
+                if (topPc >= 0 && v.back() % 12 != topPc)
+                    continue;
                 const float mean = (float) std::accumulate (v.begin(), v.end(), 0) / (float) v.size();
                 float score = std::abs (mean - (float) centre) + 0.15f * (float) (v.back() - v.front());
                 if (previousUpper != nullptr && ! previousUpper->empty())
@@ -110,6 +150,18 @@ namespace Voicing
                     best = v;
                 }
             }
+        }
+
+        if (best.empty()) // no voicing could put that note on top: fall back to the automatic choice
+            return make (root, quality, includeBass, centre, previousUpper, bassLow, style, 0);
+
+        // Spread the voicing: drop 2 moves the second-highest note down an octave, open also drops the fourth
+        if (style == drop2 || style == open)
+        {
+            std::sort (best.begin(), best.end());
+            if (best.size() >= 3) best[best.size() - 2] -= 12;
+            if (style == open && best.size() >= 4) best[best.size() - 4] -= 12;
+            std::sort (best.begin(), best.end());
         }
 
         std::vector<int> notes;
@@ -443,4 +495,39 @@ ChordSet transposeSet (const ChordSet& set, int semitones)
         }
     }
     return out;
+}
+
+namespace Suggest
+{
+    std::array<float, 12> score (const Chord& last, const std::array<Chord, 12>& options)
+    {
+        std::array<float, 12> out {};
+        out.fill (-100.0f);
+        if (last.root < 0 && last.notes.empty())
+            return out;
+        const int lastRoot = last.root >= 0 ? last.root : last.notes.front() % 12;
+        const bool lastDominant = last.quality >= 0 && ChordQ::info (last.quality).family == ChordQ::dominant;
+        std::set<int> lastPcs;
+        for (int n : last.notes) lastPcs.insert (n % 12);
+
+        // How good each root movement usually sounds in soul / R&B / gospel
+        static const std::array<float, 12> motion { -5.0f, 0.6f, 1.0f, 0.8f, 0.7f, 3.0f, 0.3f, 1.0f, 0.9f, 1.2f, 1.2f, 0.8f };
+        for (size_t k = 0; k < 12; ++k)
+        {
+            const auto& o = options[k];
+            if (o.isEmpty() || o.name == last.name)
+                continue;
+            const int root = o.root >= 0 ? o.root : o.notes.front() % 12;
+            const int step = (root - lastRoot + 12) % 12;
+            float s = motion[(size_t) step];
+            if (lastDominant && step == 5) s += 1.5f;   // dominant resolving up a fourth
+            if (lastDominant && step == 11) s += 1.2f;  // tritone sub resolving down a half step
+            int common = 0;
+            for (int n : o.notes)
+                if (lastPcs.count (n % 12)) ++common;
+            s += 0.35f * (float) std::min (common, 4);
+            out[k] = s;
+        }
+        return out;
+    }
 }

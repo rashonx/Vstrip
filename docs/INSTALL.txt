@@ -69,3 +69,28 @@ A preset is a small text file ending in .soulkeys:
   }
 "white" = the chords for C D E F G A B, "black" = C# D# F# G# A# (leave it out and related chords
 are added automatically).
+
+New in v1.3.0
+-------------
+MIDI OUTPUT
+- MIDI OUTPUT: "Sound + MIDI" plays the plugin and sends the chords out as MIDI, "MIDI only" sends
+  MIDI and keeps the plugin silent. Zone A sends on MIDI channel 1, zone B on channel 2.
+- FL Studio: open the plugin's wrapper settings (gear icon) > "MIDI" section and set an Output port
+  number. On the instrument you want to play, set its Input port to the same number.
+  Other DAWs: create a MIDI track whose input is Rashon Soul Keys.
+- A recorded take (DRAG MIDI) works with any instrument too.
+
+VOICING
+- Close, Open, Drop 2 (classic jazz/gospel spread) and Rootless (no root or bass - great when a bass
+  player covers the root).
+- TOP NOTE picks which chord tone is the highest note (Root, 3rd, 5th, 7th, 9th, 11th, 13th), so you can
+  shape a melody line across your chords.
+
+SUGGEST NEXT CHORD
+- After each chord, the 3 keys most likely to sound good next glow on the chord map, and are listed
+  under "Now playing" as "Try next".
+
+UNDO / REDO and COMPARE
+- UNDO / REDO step back and forward through your changes.
+- COMPARE 1 / 2 holds two complete setups. Switch between them to compare; COPY copies the current
+  setup into the other slot.

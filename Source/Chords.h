@@ -47,7 +47,10 @@ namespace Voicing
 {
     // Root in the bass (C2-B2) plus the upper structure arranged around `centre`.
     // With `previousUpper`, picks the inversion that moves the least (voice leading).
-    std::vector<int> make (int root, int quality, bool includeBass, int centre, const std::vector<int>* previousUpper, int bassLow = 36);
+    enum Style { close = 0, open, drop2, rootless };
+    // topDegree: 0 auto, 1 root, 2 3rd, 3 5th, 4 7th, 5 9th, 6 11th, 7 13th (that chord tone goes on top)
+    std::vector<int> make (int root, int quality, bool includeBass, int centre, const std::vector<int>* previousUpper,
+                           int bassLow = 36, int style = close, int topDegree = 0);
 
     juce::String name (int root, int quality, int bassPc = -1);
 
@@ -71,6 +74,12 @@ namespace ScaleChords
 {
     juce::StringArray scaleNames();
     ChordSet make (int keyPc, int scaleIndex);
+}
+
+// Which keys would sound good after the last chord (higher score = better)
+namespace Suggest
+{
+    std::array<float, 12> score (const Chord& last, const std::array<Chord, 12>& options);
 }
 
 // Moves a whole chord set by some semitones (roots, names and voicings)

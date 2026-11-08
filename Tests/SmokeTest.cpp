@@ -2,10 +2,18 @@
 #include "../Source/PluginProcessor.h"
 #include "../Source/ChordExtractor.h"
 #include "../Source/PresetFile.h"
+#include <thread>
 
 namespace
 {
     int failures = 0;
+    // Lets the plugin's background timers run for a moment (parameters reach the undo history this way)
+    void pump (int ms)
+    {
+        std::thread t ([ms] { juce::Thread::sleep (ms); juce::MessageManager::callAsync ([] { juce::MessageManager::getInstance()->stopDispatchLoop(); }); });
+        juce::MessageManager::getInstance()->runDispatchLoop();
+        t.join();
+    }
     void check (bool ok, const juce::String& what, const juce::String& detail = {})
     {
         std::printf ("%s %s %s\n", ok ? "  ok  " : "  FAIL", what.toRawUTF8(), detail.toRawUTF8());
@@ -264,6 +272,111 @@ int main()
         for (auto& e : take) (e.on ? ons : offs)++;
         const int expected = (int) (k.chordForKey (0, 0).notes.size() + k.chordForKey (2, 0).notes.size());
         check (ons == expected && offs == expected, "recorder captures every chord note", juce::String (ons) + " on / " + juce::String (offs) + " off");
+    }
+
+    // 13. Voicing styles and top note
+    {
+        SoulKeysProcessor k;
+        auto span = [] (const Chord& c) { return c.notes.back() - c.notes.front(); };
+        auto upperSpan = [] (const Chord& c) { std::vector<int> u; for (int n : c.notes) if (n >= 48) u.push_back (n); return u.empty() ? 0 : u.back() - u.front(); };
+        const auto closeChord = k.chordForKey (2, 0); // Fm9
+        set (k, "voicing", 2.0f);
+        const auto drop2 = k.chordForKey (2, 0);
+        set (k, "voicing", 1.0f);
+        const auto open = k.chordForKey (2, 0);
+        check (upperSpan (drop2) > upperSpan (closeChord) && span (open) >= span (drop2), "drop 2 and open spread the chord",
+               juce::String (upperSpan (closeChord)) + " / " + juce::String (upperSpan (drop2)) + " / " + juce::String (span (open)));
+        set (k, "voicing", 3.0f);
+        const auto rootless = k.chordForKey (2, 0);
+        const bool noRoot = std::none_of (rootless.notes.begin(), rootless.notes.end(), [] (int n) { return n % 12 == 5; }); // F
+        check (noRoot && rootless.notes.front() >= 48, "rootless leaves out the root and bass", rootless.name);
+        set (k, "voicing", 0.0f);
+        bool topOk = true;
+        juce::String tops;
+        for (auto [degree, interval] : { std::pair { 2, 3 }, { 4, 10 }, { 5, 14 }, { 1, 0 } }) // Fm9: 3rd = Ab, 7th = Eb, 9th = G, root = F
+        {
+            set (k, "topNote", (float) degree);
+            const auto c = k.chordForKey (2, 0);
+            topOk = topOk && c.notes.back() % 12 == (5 + interval) % 12;
+            tops << ChordQ::noteName (c.notes.back()) << " ";
+        }
+        check (topOk, "top note puts the chosen chord tone on top (Ab, Eb, G, F)", tops);
+    }
+
+    // 14. MIDI output
+    {
+        SoulKeysProcessor k;
+        k.setRateAndBufferSizeDetails (48000.0, 512);
+        k.prepareToPlay (48000.0, 512);
+        set (k, "midiOut", 2.0f);  // MIDI only
+        set (k, "strum", 0.0f);
+        set (k, "humanize", 0.0f);
+        set (k, "split", 1.0f);
+        juce::AudioBuffer<float> buf (2, 512);
+        juce::MidiBuffer midi;
+        midi.addEvent (juce::MidiMessage::noteOn (1, 50, 0.8f), 0);
+        midi.addEvent (juce::MidiMessage::noteOn (1, 72, 0.8f), 0);
+        k.processBlock (buf, midi);
+        int ch1 = 0, ch2 = 0;
+        for (const auto meta : midi)
+        {
+            const auto m = meta.getMessage();
+            if (m.isNoteOn()) (m.getChannel() == 1 ? ch1 : ch2)++;
+        }
+        const int expectA = (int) k.chordForKey (2, 0).notes.size(), expectB = (int) k.chordForKey (0, 1).notes.size();
+        check (ch1 == expectA && ch2 == expectB && buf.getMagnitude (0, 512) < 1.0e-6f, "MIDI only: chords go out as MIDI, zone A ch 1, zone B ch 2, no sound",
+               juce::String (ch1) + "+" + juce::String (ch2) + " notes");
+        set (k, "midiOut", 0.0f);
+        juce::MidiBuffer midi2;
+        midi2.addEvent (juce::MidiMessage::noteOn (1, 52, 0.8f), 0);
+        k.processBlock (buf, midi2);
+        check (midi2.isEmpty(), "MIDI output off sends nothing");
+    }
+
+    // 14b. Silence when nothing plays (no tape hiss leaking from an unused zone)
+    {
+        SoulKeysProcessor k;
+        k.setRateAndBufferSizeDetails (48000.0, 512);
+        k.prepareToPlay (48000.0, 512);
+        juce::AudioBuffer<float> buf (2, 512);
+        float peak = 0.0f;
+        for (int b = 0; b < 300; ++b) { juce::MidiBuffer none; k.processBlock (buf, none); if (b > 20) peak = std::max (peak, buf.getMagnitude (0, 512)); }
+        check (peak < 1.0e-4f, "silent when nothing is playing", juce::String (peak, 6));
+    }
+
+    // 15. Undo and compare
+    {
+        SoulKeysProcessor k;
+        set (k, "chordSet", 7.0f);
+        (void) k.apvts.copyState(); // copies parameter changes into the state, as the plugin's timer does
+        k.undoManager.beginNewTransaction();
+        set (k, "chordSet", 20.0f);
+        (void) k.apvts.copyState(); // copies parameter changes into the state, as the plugin's timer does
+        k.undoManager.beginNewTransaction();
+        k.undoManager.undo();
+        (void) k.apvts.copyState(); // copies parameter changes into the state, as the plugin's timer does
+        check (juce::roundToInt (k.apvts.getRawParameterValue ("chordSet")->load()) == 7, "undo restores the previous setting");
+        k.undoManager.redo();
+        (void) k.apvts.copyState(); // copies parameter changes into the state, as the plugin's timer does
+        check (juce::roundToInt (k.apvts.getRawParameterValue ("chordSet")->load()) == 20, "redo");
+
+        k.switchCompare (1);
+        set (k, "chordSet", 33.0f);
+        k.switchCompare (0);
+        const int one = juce::roundToInt (k.apvts.getRawParameterValue ("chordSet")->load());
+        k.switchCompare (1);
+        const int two = juce::roundToInt (k.apvts.getRawParameterValue ("chordSet")->load());
+        check (one == 20 && two == 33, "compare 1 / 2 keeps two setups", juce::String (one) + " / " + juce::String (two));
+    }
+
+    // 16. Next-chord suggestions: after G7 the C chord should come first
+    {
+        std::array<Chord, 12> options;
+        const char* names[] { "Cmaj9", "Db9", "Dm9", "Eb13", "Em7", "Fmaj9", "F#m7b5", "G13", "Abmaj7", "Am9", "Bb9", "Bm7b5" };
+        for (int i = 0; i < 12; ++i) options[(size_t) i] = Voicing::parseName (names[i]);
+        const auto scores = Suggest::score (Voicing::parseName ("G7"), options);
+        const int best = (int) (std::max_element (scores.begin(), scores.end()) - scores.begin());
+        check (best == 0, "suggestion after G7 is Cmaj9", options[(size_t) best].name);
     }
 
     std::printf (failures == 0 ? "PASS\n" : "FAIL (%d)\n", failures);

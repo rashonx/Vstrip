@@ -255,8 +255,11 @@ void FxChain::process (juce::AudioBuffer<float>& buffer, const FxSettings& s)
         const double flutterStep = juce::MathConstants<double>::twoPi * 6.8 / sr;
         const float lpCoef = std::exp (-juce::MathConstants<float>::twoPi * (18000.0f - 12500.0f * s.age) / (float) sr);
         const float driveAmt = 1.0f + 3.0f * s.age;
+        const float hissTarget = s.notesActive ? 1.0f : 0.0f;
+        const float hissCoef = std::exp (-1.0f / ((s.notesActive ? 0.02f : 1.5f) * (float) sr));
         for (int i = 0; i < n; ++i)
         {
+            hissLevel = hissCoef * hissLevel + (1.0f - hissCoef) * hissTarget;
             const float delayMs = 6.0f + s.wobble * (3.0f * (float) std::sin (wowPhase) + 0.35f * (float) std::sin (flutterPhase));
             wowPhase += wowStep;
             flutterPhase += flutterStep;
@@ -270,7 +273,7 @@ void FxChain::process (juce::AudioBuffer<float>& buffer, const FxSettings& s)
                 ageLp[(size_t) ch] = lpCoef * ageLp[(size_t) ch] + (1.0f - lpCoef) * y;
                 y = s.age > 0.001f ? ageLp[(size_t) ch] : y;
                 hissLp[(size_t) ch] += 0.5f * ((rng.nextFloat() * 2.0f - 1.0f) - hissLp[(size_t) ch]);
-                data[i] = y + hissLp[(size_t) ch] * s.hiss * 0.006f;
+                data[i] = y + hissLp[(size_t) ch] * s.hiss * 0.006f * hissLevel;
             }
         }
         wowPhase = std::fmod (wowPhase, juce::MathConstants<double>::twoPi);
