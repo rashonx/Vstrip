@@ -53,6 +53,9 @@ namespace Voicing
 
     // Best guess at the root and quality of a set of notes (lowest note is the bass)
     Chord identify (const std::vector<int>& notes);
+
+    // Reads a chord name like "Ebmaj9", "F#m11", "C13(b9)", "Bbø", "G7sus" (empty Chord if unreadable)
+    Chord parseName (const juce::String& name);
 }
 
 // 12 chords: one per key of the octave (index = pitch class: 0 = C, 1 = C#, ...)

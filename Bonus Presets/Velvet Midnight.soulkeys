@@ -1,0 +1,7 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "name": "Velvet Midnight",
+  "tonic": "F",
+  "white": ["Fm11", "Gm9(b5)", "Abmaj9", "Bbm9", "C7(#9)", "Dbmaj9(#11)", "Eb13"],
+  "flavours": "TSCTS"
+}

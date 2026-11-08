@@ -1,0 +1,7 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "name": "Sunday Brunch Gospel",
+  "tonic": "Ab",
+  "white": ["Abmaj9", "Bbm9", "Cm7", "Dbmaj9", "Eb13sus4", "Fm11", "Gbmaj9(#11)"],
+  "black": ["F13(b9)", "Bdim7", "Eb9", "C7(#9)", "Fdim7"]
+}

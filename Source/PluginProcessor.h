@@ -15,6 +15,8 @@ public:
     static constexpr int numZones = 2;
     static constexpr int scaleSlot = 50;  // chord-set index of "Key & Scale"
     static constexpr int fileSlot = 51;   // chord-set index of "From file"
+    static constexpr int libraryStart = 52; // first of "My Presets" (your saved and imported presets)
+    static constexpr int maxLibrary = 200;
 
     SoulKeysProcessor();
     ~SoulKeysProcessor() override = default;
@@ -47,7 +49,21 @@ public:
     // Parameter id for a zone: zone A uses the plain id, zone B adds "B"
     static juce::String pid (int zone, const char* base) { return zone == 0 ? juce::String (base) : juce::String (base) + "B"; }
 
-    int numChordSets() const { return fileSlot + 1; }
+    int numChordSets() const;
+
+    // My Presets: .soulkeys files in Documents/Dodge City Plugins/Soul Keys/Presets
+    void reloadLibrary();
+    juce::String importPreset (const juce::File& file, int zone);          // returns an error, or empty when it worked
+    juce::String saveZoneAsPreset (int zone, const juce::String& name);   // the zone's chords as currently set (key applied)
+    ChordSet zoneChordsAsSet (int zone) const;
+
+    // Recording what's played
+    struct RecEvent { double time; int note; float velocity; bool on; };
+    void startRecording();
+    void stopRecording();
+    bool isRecording() const { return recording.load(); }
+    void drainRecording (std::vector<RecEvent>& into);
+    double hostBpm() const { return bpm.load(); }
     juce::String chordSetName (int zone, int index) const;
     ChordSet getChordSet (int zone, int index) const;   // as written, before key transposition
     void setUserChords (int zone, const ChordSet& set); // also selects "From file" for that zone
@@ -99,6 +115,12 @@ private:
     void emitDue (int numSamples);
 
     std::array<Zone, numZones> zones;
+    std::vector<ChordSet> library;
+
+    std::atomic<bool> recording { false };
+    std::atomic<double> bpm { 120.0 };
+    juce::AbstractFifo recFifo { 8192 };
+    std::array<RecEvent, 8192> recBuffer {};
     std::atomic<float> *splitParam = nullptr, *splitPointParam = nullptr;
     mutable juce::CriticalSection chordLock;
 

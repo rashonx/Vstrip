@@ -1,0 +1,7 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "name": "Philly Rooftop",
+  "tonic": "D",
+  "white": ["Dmaj9", "Em11", "F#m7", "Gmaj9(#11)", "A13sus4", "Bm9", "C9(#11)"],
+  "black": ["B13(b9)", "Gdim7", "D9", "F#7alt", "Fmaj7(#5)"]
+}

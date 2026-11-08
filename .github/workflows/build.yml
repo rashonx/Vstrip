@@ -34,6 +34,7 @@ jobs:
           Get-ChildItem "$bundle/Contents" -Recurse -File -Filter "$name.vst3" | Rename-Item -NewName "$name v$v.vst3"
           Copy-Item "build/SoulKeys_artefacts/Release/Standalone/$name.exe" "dist/$name v$v.exe"
           Copy-Item docs/INSTALL.txt "dist/INSTALL v$v.txt"
+          Copy-Item -Recurse "Bonus Presets" "dist/Bonus Presets"
 
       - uses: actions/upload-artifact@v4
         with:

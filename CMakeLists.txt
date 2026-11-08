@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(RashonSoulKeys VERSION 1.1.0)
+project(RashonSoulKeys VERSION 1.2.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -33,6 +33,7 @@ juce_add_binary_data(SoulKeysAssets SOURCES Assets/dodge_city_logo.png)
 target_sources(SoulKeys PRIVATE
   Source/Chords.cpp
   Source/ChordExtractor.cpp
+  Source/PresetFile.cpp
   Source/SoundEngine.cpp
   Source/PluginProcessor.cpp
   Source/PluginEditor.cpp)

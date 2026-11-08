@@ -1,6 +1,7 @@
 // Checks the chord presets, every sound, extensions, and chord pulling from MIDI and audio.
 #include "../Source/PluginProcessor.h"
 #include "../Source/ChordExtractor.h"
+#include "../Source/PresetFile.h"
 
 namespace
 {
@@ -203,6 +204,66 @@ int main()
         check (k.chordForKey (0, 1).name == before, "swap A / B", k.chordForKey (0, 1).name);
         set (k, "split", 0.0f);
         check (k.zoneOf (72) == 0, "split off: every key uses zone A");
+    }
+
+    // 10. Chord names typed by hand
+    {
+        juce::StringArray got;
+        for (auto n : { "Ebmaj9", "F#m11", "C13(b9)", "Bbm7b5", "G7sus", "Db6/9", "Am", "E7#9", "Gbmaj9#11", "Bb13sus4", "Fdim7", "C/E" })
+            got.add (Voicing::parseName (n).name);
+        check (got.joinIntoString (" ") == "Ebmaj9 Gbm11 C13(b9) Bbm7(b5) G7sus4 Db6/9 Am7 E7(#9) Gbmaj9(#11) Bb13sus4 Fdim7 Cadd9", "read chord names", got.joinIntoString (" "));
+    }
+
+    // 11. Bonus presets import, and a saved preset comes back identical
+    {
+        const auto folder = juce::File::getCurrentWorkingDirectory().getChildFile ("Bonus Presets");
+        int ok = 0;
+        juce::String errors;
+        for (auto& f : folder.findChildFiles (juce::File::findFiles, false, "*.soulkeys"))
+        {
+            ChordSet set; juce::String error;
+            if (PresetFile::load (f, set, error)) ++ok; else errors << f.getFileName() << ": " << error << " ";
+        }
+        check (ok == 3, "bonus presets load", errors);
+
+        SoulKeysProcessor k;
+        const auto before = k.numChordSets();
+        const auto importError = k.importPreset (folder.getChildFile ("Philly Rooftop.soulkeys"), 0);
+        check (importError.isEmpty() && k.chordForKey (0, 0).name == "Dmaj9" && k.chordForKey (1, 0).name == "B13(b9)",
+               "import a preset and play it", importError + " " + k.chordForKey (0, 0).name);
+
+        set (k, "chordSet", 3.0f);
+        set (k, "key", 1.0f); // move to C before saving
+        const auto saveError = k.saveZoneAsPreset (0, "Smoke Test Preset");
+        juce::StringArray names;
+        for (int pc = 0; pc < 12; ++pc) names.add (k.chordForKey (pc, 0).name);
+        check (saveError.isEmpty() && k.numChordSets() > before && k.chordSetName (0, juce::roundToInt (k.apvts.getRawParameterValue ("chordSet")->load())) == "My: Smoke Test Preset",
+               "save chords as a new preset", saveError);
+        ChordSet reread; juce::String error;
+        PresetFile::load (PresetFile::folder().getChildFile ("Smoke Test Preset.soulkeys"), reread, error);
+        juce::StringArray rereadNames;
+        for (auto& c : reread.chords) rereadNames.add (c.name);
+        check (rereadNames == names, "saved preset reads back the same", rereadNames[0]);
+        PresetFile::folder().getChildFile ("Smoke Test Preset.soulkeys").deleteFile();
+        PresetFile::folder().getChildFile ("Philly Rooftop.soulkeys").deleteFile();
+    }
+
+    // 12. Recorder captures the chords that were played
+    {
+        SoulKeysProcessor k;
+        k.setRateAndBufferSizeDetails (48000.0, 512);
+        k.prepareToPlay (48000.0, 512);
+        k.startRecording();
+        bool finite = true;
+        play (k, 60, 0.5f, finite);
+        play (k, 62, 0.5f, finite);
+        k.stopRecording();
+        std::vector<SoulKeysProcessor::RecEvent> take;
+        k.drainRecording (take);
+        int ons = 0, offs = 0;
+        for (auto& e : take) (e.on ? ons : offs)++;
+        const int expected = (int) (k.chordForKey (0, 0).notes.size() + k.chordForKey (2, 0).notes.size());
+        check (ons == expected && offs == expected, "recorder captures every chord note", juce::String (ons) + " on / " + juce::String (offs) + " off");
     }
 
     std::printf (failures == 0 ? "PASS\n" : "FAIL (%d)\n", failures);

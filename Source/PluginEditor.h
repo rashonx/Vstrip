@@ -52,6 +52,19 @@ private:
     const KeysSkin* skin = &KeysSkin::all().front();
 };
 
+// A button you can drag out of the plugin: drops the recorded take as a MIDI file into the DAW.
+class DragMidiButton : public juce::TextButton
+{
+public:
+    DragMidiButton() : juce::TextButton ("DRAG MIDI") {}
+    std::function<juce::File()> makeFile;
+    void mouseDrag (const juce::MouseEvent& e) override;
+    void mouseUp (const juce::MouseEvent& e) override { dragging = false; juce::TextButton::mouseUp (e); }
+
+private:
+    bool dragging = false;
+};
+
 class SoulKeysEditor : public juce::AudioProcessorEditor,
                        public juce::FileDragAndDropTarget,
                        private juce::Timer
@@ -80,6 +93,7 @@ private:
         juce::Label setCaption, keyCaption, scaleCaption, extCaption, octCaption;
         juce::ComboBox setBox, keyBox, scaleBox;
         juce::TextButton prev { "<" }, next { ">" }, octDown { "-" }, octUp { "+" }, load { "FROM FILE..." };
+        juce::TextButton savePreset { "SAVE PRESET" }, importPreset { "IMPORT" };
         juce::Label octValue;
         juce::OwnedArray<juce::TextButton> ext;
         std::unique_ptr<CA> setAtt, keyAtt, scaleAtt;
@@ -105,6 +119,12 @@ private:
     void timerCallback() override;
     void applySkinColours();
     void drawPanel (juce::Graphics&, juce::Rectangle<int> r, const juce::String& title, juce::Colour stripe);
+    void showStatus (const juce::String& text);
+    void askToSavePreset (int zone);
+    juce::File writeTake (const juce::File& file) const;
+    juce::File takeFileForDrag();
+    void finishTake();
+    juce::String takeSummary() const;
 
     SoulKeysProcessor& processor;
     KeysLookAndFeel lnf;
@@ -132,6 +152,15 @@ private:
     juce::ToggleButton bassToggle, leadingToggle, chordModeToggle;
     juce::Label strumLabel, bassLabel, leadingLabel, chordModeLabel, status;
     std::unique_ptr<BA> bassAtt, leadingAtt, chordModeAtt;
+
+    // Recorder
+    juce::TextButton recButton { "REC" }, stopButton { "STOP" }, clearButton { "CLEAR" }, saveMidiButton { "SAVE MIDI..." };
+    DragMidiButton dragButton;
+    juce::Label recCaption, takeInfo;
+    std::vector<SoulKeysProcessor::RecEvent> take;
+    double takeBpm = 120.0;
+    juce::File lastDragFile;
+    double statusUntil = 0.0;
 
     std::vector<std::tuple<juce::Rectangle<int>, juce::String, bool>> panels; // area, title, uses zone B colour
     std::unique_ptr<juce::FileChooser> chooser;

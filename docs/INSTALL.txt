@@ -43,3 +43,29 @@ KEY & SCALE
 SKINS
 - 15 skins in the SKIN menu at the top right. Your choice is saved with the project and
   remembered for new instances.
+
+New in v1.2.0
+-------------
+RECORD WHAT YOU PLAY
+- Press REC, play, then STOP. The take uses your project's tempo.
+- Hold the mouse on DRAG MIDI and drag it onto a MIDI track, FL Studio's playlist or the piano roll.
+  The take is the full chords you played (every note), so it plays back on any instrument.
+- SAVE MIDI... saves the take as a .mid file (handy if a DAW doesn't accept dragging).
+
+MY PRESETS
+- SAVE PRESET (in each zone) saves that zone's chords as your own preset, including chords pulled
+  from a MIDI or audio file and Key & Scale chords. They appear in the chord set menu as "My: <name>".
+- IMPORT (or drag .soulkeys files onto the plugin) adds preset files to My Presets.
+- Presets live in Documents\Dodge City Plugins\Soul Keys\Presets. Copy that folder to move them
+  to another computer.
+- The "Bonus Presets" folder in this download has 3 presets to try: import them with IMPORT.
+
+WRITING YOUR OWN PRESET FILE (or ask Claude to write one)
+A preset is a small text file ending in .soulkeys:
+  {
+    "name": "My Set",
+    "white": ["Ebmaj9", "Fm9", "Gm7", "Abmaj9", "Bb13sus4", "Cm11", "Db9"],
+    "black": ["C13(b9)", "Gbdim7", "B9(#11)", "G13(b9)", "D9"]
+  }
+"white" = the chords for C D E F G A B, "black" = C# D# F# G# A# (leave it out and related chords
+are added automatically).

@@ -1,5 +1,6 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
+#include "PresetFile.h"
 
 namespace
 {
@@ -38,7 +39,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SoulKeysProcessor::createLay
     for (int z = 0; z < numZones; ++z)
     {
         const String zn = z == 0 ? " A" : " B";
-        p.push_back (std::make_unique<AudioParameterInt> (ParameterID { pid (z, "chordSet"), 1 }, "Chord Set" + zn, 0, fileSlot, z == 0 ? 0 : 1));
+        p.push_back (std::make_unique<AudioParameterInt> (ParameterID { pid (z, "chordSet"), 1 }, "Chord Set" + zn, 0, libraryStart + maxLibrary - 1, z == 0 ? 0 : 1));
         p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { pid (z, "extensions"), 1 }, "Extensions" + zn, StringArray { "As preset", "7th", "9th", "11th" }, 0));
         p.push_back (std::make_unique<AudioParameterInt> (ParameterID { pid (z, "octave"), 1 }, "Octave" + zn, -2, 2, 0));
         p.push_back (std::make_unique<AudioParameterChoice> (ParameterID { pid (z, "key"), 1 }, "Key" + zn, keyChoices(), 0));
@@ -77,6 +78,7 @@ SoulKeysProcessor::SoulKeysProcessor()
       apvts (*this, nullptr, "PARAMS", createLayout())
 {
     presetSets(); // build the 50 chord sets now, not on the audio thread
+    reloadLibrary();
     for (int z = 0; z < numZones; ++z)
     {
         auto& zone = zones[(size_t) z];
@@ -120,9 +122,90 @@ void SoulKeysProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 //==============================================================================
 // Chord sets
 
+int SoulKeysProcessor::numChordSets() const
+{
+    const juce::ScopedLock sl (chordLock);
+    return libraryStart + (int) library.size();
+}
+
+void SoulKeysProcessor::reloadLibrary()
+{
+    std::vector<ChordSet> sets;
+    auto files = PresetFile::folder().findChildFiles (juce::File::findFiles, false, "*" + PresetFile::extension());
+    files.sort();
+    for (const auto& f : files)
+    {
+        ChordSet set;
+        juce::String error;
+        if (PresetFile::load (f, set, error))
+            sets.push_back (set);
+        if ((int) sets.size() >= maxLibrary) break;
+    }
+    const juce::ScopedLock sl (chordLock);
+    library = std::move (sets);
+}
+
+juce::String SoulKeysProcessor::importPreset (const juce::File& file, int zone)
+{
+    ChordSet set;
+    juce::String error;
+    if (! PresetFile::load (file, set, error))
+        return error;
+    // Keep a copy in the presets folder so it's there next time
+    const auto dest = PresetFile::folder().getChildFile (file.getFileName());
+    if (dest != file)
+        file.copyFileTo (dest);
+    reloadLibrary();
+    const juce::ScopedLock sl (chordLock);
+    for (size_t i = 0; i < library.size(); ++i)
+        if (library[i].name == set.name)
+        {
+            auto* p = apvts.getParameter (pid (zone, "chordSet"));
+            p->beginChangeGesture();
+            p->setValueNotifyingHost (p->convertTo0to1 ((float) (libraryStart + (int) i)));
+            p->endChangeGesture();
+            break;
+        }
+    return {};
+}
+
+ChordSet SoulKeysProcessor::zoneChordsAsSet (int zone) const
+{
+    ChordSet set;
+    for (int pc = 0; pc < 12; ++pc)
+    {
+        auto c = pickChord (zone, pc, true);
+        if (c.root >= 0 && c.quality >= 0)
+        {
+            c.notes = Voicing::make (c.root, c.quality, true, 62, nullptr);
+            c.name = Voicing::name (c.root, c.quality);
+        }
+        set.chords[(size_t) pc] = c;
+    }
+    set.tonic = set.chords[0].root;
+    return set;
+}
+
+juce::String SoulKeysProcessor::saveZoneAsPreset (int zone, const juce::String& name)
+{
+    auto set = zoneChordsAsSet (zone);
+    set.name = name;
+    juce::String error;
+    const auto file = PresetFile::save (set, error);
+    if (error.isNotEmpty())
+        return error;
+    return importPreset (file, zone);
+}
+
 juce::String SoulKeysProcessor::chordSetName (int zone, int index) const
 {
     if (index == scaleSlot) return "Key & Scale chords";
+    if (index >= libraryStart)
+    {
+        const juce::ScopedLock sl (chordLock);
+        const auto i = (size_t) (index - libraryStart);
+        return i < library.size() ? "My: " + library[i].name : "(empty)";
+    }
     if (index >= fileSlot)
     {
         const juce::ScopedLock sl (chordLock);
@@ -139,7 +222,14 @@ ChordSet SoulKeysProcessor::getChordSet (int zone, int index) const
         const int key = juce::roundToInt (param (zones[(size_t) zone].p.key));
         return ScaleChords::make (key == 0 ? 0 : key - 1, juce::roundToInt (param (zones[(size_t) zone].p.scale)));
     }
-    if (index >= fileSlot)
+    if (index >= libraryStart)
+    {
+        const juce::ScopedLock sl (chordLock);
+        const auto i = (size_t) (index - libraryStart);
+        if (i < library.size())
+            return library[i];
+    }
+    else if (index >= fileSlot)
     {
         const juce::ScopedLock sl (chordLock);
         if (! zones[(size_t) zone].user.chords[0].isEmpty())
@@ -213,7 +303,17 @@ Chord SoulKeysProcessor::pickChord (int zoneIndex, int pc, bool forDisplay) cons
             return getChordSet (zoneIndex, index).chords[(size_t) pc]; // built in the key already
         return zone.scaleSet.chords[(size_t) pc];
     }
-    if (index >= fileSlot)
+    if (index >= libraryStart)
+    {
+        const juce::ScopedTryLock sl (chordLock);
+        const auto i = (size_t) (index - libraryStart);
+        if (sl.isLocked() && i < library.size())
+        {
+            c = library[i].chords[(size_t) pc];
+            tonic = library[i].tonic;
+        }
+    }
+    else if (index >= fileSlot)
     {
         const juce::ScopedTryLock sl (chordLock);
         if (sl.isLocked() && ! zone.user.chords[0].isEmpty())
@@ -352,8 +452,30 @@ void SoulKeysProcessor::emitDue (int numSamples)
     }
 }
 
+void SoulKeysProcessor::startRecording()
+{
+    recFifo.reset();
+    recording = true;
+}
+
+void SoulKeysProcessor::stopRecording()
+{
+    recording = false;
+}
+
+void SoulKeysProcessor::drainRecording (std::vector<RecEvent>& into)
+{
+    const auto scope = recFifo.read (recFifo.getNumReady());
+    for (int i = 0; i < scope.blockSize1; ++i) into.push_back (recBuffer[(size_t) (scope.startIndex1 + i)]);
+    for (int i = 0; i < scope.blockSize2; ++i) into.push_back (recBuffer[(size_t) (scope.startIndex2 + i)]);
+}
+
 void SoulKeysProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
+    if (auto* head = getPlayHead())
+        if (auto pos = head->getPosition())
+            if (auto b = pos->getBpm())
+                bpm = *b;
     juce::ScopedNoDenormals noDenormals;
     const int n = buffer.getNumSamples();
     buffer.clear();
@@ -393,6 +515,21 @@ void SoulKeysProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
             for (auto& z : zones) z.midi.addEvent (m, meta.samplePosition); // pedal etc. goes to both zones
     }
     emitDue (n);
+
+    // Capture the notes that actually play (whole chords) for the recorder
+    if (recording.load())
+    {
+        const double sr = getSampleRate() > 0.0 ? getSampleRate() : 44100.0;
+        for (auto& z : zones)
+            for (const auto meta : z.midi)
+            {
+                const auto m = meta.getMessage();
+                if (! m.isNoteOnOrOff()) continue;
+                const auto scope = recFifo.write (1);
+                if (scope.blockSize1 > 0)
+                    recBuffer[(size_t) scope.startIndex1] = { (blockStart + meta.samplePosition) / sr, m.getNoteNumber(), m.getFloatVelocity(), m.isNoteOn() };
+            }
+    }
 
     for (auto& z : zones)
     {
@@ -456,6 +593,12 @@ void SoulKeysProcessor::getStateInformation (juce::MemoryBlock& destData)
         const juce::ScopedLock sl (chordLock);
         writeSet (*xml, "UserChords", zones[0].user);
         writeSet (*xml, "UserChordsB", zones[1].user);
+        for (int z = 0; z < numZones; ++z)
+        {
+            const int index = juce::roundToInt (param (zones[(size_t) z].p.chordSet));
+            if (index >= libraryStart && (size_t) (index - libraryStart) < library.size())
+                xml->setAttribute (z == 0 ? "libraryPresetA" : "libraryPresetB", library[(size_t) (index - libraryStart)].name);
+        }
     }
     copyXmlToBinary (*xml, destData);
 }
@@ -475,7 +618,25 @@ void SoulKeysProcessor::setStateInformation (const void* data, int sizeInBytes)
             }
             xml->removeChildElement (user, true);
         }
+    const juce::String libNames[] { xml->getStringAttribute ("libraryPresetA"), xml->getStringAttribute ("libraryPresetB") };
+    xml->removeAttribute ("libraryPresetA");
+    xml->removeAttribute ("libraryPresetB");
     apvts.replaceState (juce::ValueTree::fromXml (*xml));
+
+    // "My Presets" can be in a different order on another computer: find them by name
+    reloadLibrary();
+    for (int z = 0; z < numZones; ++z)
+    {
+        if (libNames[z].isEmpty()) continue;
+        int found = -1;
+        {
+            const juce::ScopedLock sl (chordLock);
+            for (size_t i = 0; i < library.size(); ++i)
+                if (library[i].name == libNames[z]) found = libraryStart + (int) i;
+        }
+        auto* p = apvts.getParameter (pid (z, "chordSet"));
+        p->setValueNotifyingHost (p->convertTo0to1 ((float) (found >= 0 ? found : 0)));
+    }
 }
 
 juce::AudioProcessorEditor* SoulKeysProcessor::createEditor()

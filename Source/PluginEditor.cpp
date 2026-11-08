@@ -1,6 +1,7 @@
 #include "PluginEditor.h"
 #include "Artwork.h"
 #include "ChordExtractor.h"
+#include "PresetFile.h"
 #include <BinaryData.h>
 
 namespace
@@ -211,6 +212,20 @@ void ZoneKeyboard::drawBlackNote (int note, juce::Graphics& g, juce::Rectangle<f
 }
 
 //==============================================================================
+// Drag a recorded take out to the DAW
+
+void DragMidiButton::mouseDrag (const juce::MouseEvent& e)
+{
+    if (dragging || e.getDistanceFromDragStart() < 6 || ! makeFile)
+        return;
+    const auto file = makeFile();
+    if (! file.existsAsFile())
+        return;
+    dragging = true;
+    juce::DragAndDropContainer::performExternalDragDropOfFiles ({ file.getFullPathName() }, false, this, [this] { dragging = false; });
+}
+
+//==============================================================================
 // Editor
 
 SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
@@ -310,9 +325,46 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
     bassAtt = std::make_unique<BA> (processor.apvts, "bass", bassToggle);
     leadingAtt = std::make_unique<BA> (processor.apvts, "voiceLeading", leadingToggle);
     chordModeAtt = std::make_unique<BA> (processor.apvts, "chordMode", chordModeToggle);
-    status.setFont (juce::FontOptions (12.0f));
-    status.setText ("Tip: drop a MIDI or audio file on a zone's chord map to pull its chords onto those keys.", juce::dontSendNotification);
-    addAndMakeVisible (status);
+    // Recorder
+    recCaption.setText ("RECORD WHAT YOU PLAY", juce::dontSendNotification);
+    recCaption.setFont (juce::FontOptions (11.0f));
+    addAndMakeVisible (recCaption);
+    takeInfo.setFont (juce::FontOptions (11.5f));
+    addAndMakeVisible (takeInfo);
+    recButton.getProperties().set ("zoneB", true); // shows in the zone B (second) colour while recording
+    recButton.onClick = [this]
+    {
+        if (processor.isRecording()) { processor.stopRecording(); finishTake(); }
+        else
+        {
+            take.clear();
+            takeBpm = processor.hostBpm();
+            processor.startRecording();
+            showStatus ("Recording... play some chords, then press STOP.");
+        }
+    };
+    stopButton.onClick = [this] { if (processor.isRecording()) { processor.stopRecording(); finishTake(); } };
+    clearButton.onClick = [this] { processor.stopRecording(); take.clear(); showStatus ("Take cleared."); };
+    dragButton.makeFile = [this] { return takeFileForDrag(); };
+    dragButton.setTooltip ("Drag this onto a MIDI track or the piano roll in your DAW");
+    dragButton.onClick = [this] { showStatus (take.empty() ? "Record something first." : "Hold the mouse on DRAG MIDI and drag it onto a MIDI track."); };
+    saveMidiButton.onClick = [this]
+    {
+        if (take.empty()) { showStatus ("Record something first."); return; }
+        auto dir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory).getChildFile ("Dodge City Plugins").getChildFile ("Soul Keys").getChildFile ("Takes");
+        dir.createDirectory();
+        chooser = std::make_unique<juce::FileChooser> ("Save the take as a MIDI file", dir.getChildFile ("Soul Keys take " + juce::Time::getCurrentTime().formatted ("%Y-%m-%d %H-%M") + ".mid"), "*.mid");
+        chooser->launchAsync (juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                              [this] (const juce::FileChooser& fc)
+                              {
+                                  auto f = fc.getResult();
+                                  if (f == juce::File()) return;
+                                  writeTake (f.withFileExtension ("mid"));
+                                  showStatus ("Saved " + f.withFileExtension ("mid").getFileName());
+                              });
+    };
+    for (auto* b : std::initializer_list<juce::Component*> { &recButton, &stopButton, &clearButton, &dragButton, &saveMidiButton })
+        addAndMakeVisible (b);
 
     keyboard.setAvailableRange (36, 96);
     keyboard.setLowestVisibleKey (36);
@@ -329,6 +381,12 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
 SoulKeysEditor::~SoulKeysEditor()
 {
     setLookAndFeel (nullptr);
+}
+
+void SoulKeysEditor::showStatus (const juce::String& text)
+{
+    splitHint.setText (text, juce::dontSendNotification);
+    statusUntil = juce::Time::getMillisecondCounterHiRes() + 7000.0;
 }
 
 void SoulKeysEditor::setParam (const juce::String& id, float value)
@@ -353,7 +411,12 @@ void SoulKeysEditor::buildZoneRow (int z)
     }
 
     refreshSetList (z, true);
-    r.setAtt = std::make_unique<CA> (processor.apvts, SoulKeysProcessor::pid (z, "chordSet"), r.setBox);
+    // Connected by hand: the list length (presets + My Presets) differs from the parameter's range
+    r.setBox.onChange = [this, z]
+    {
+        const int index = rows[(size_t) z].setBox.getSelectedItemIndex();
+        if (index >= 0) setParam (SoulKeysProcessor::pid (z, "chordSet"), (float) index);
+    };
     addAndMakeVisible (r.setBox);
     auto step = [this, z] (int d)
     {
@@ -406,8 +469,120 @@ void SoulKeysEditor::buildZoneRow (int z)
     };
     addAndMakeVisible (r.load);
 
+    r.savePreset.setTooltip ("Save this zone's chords (including chords pulled from a file) to My Presets");
+    r.savePreset.onClick = [this, z] { askToSavePreset (z); };
+    r.importPreset.setTooltip ("Import a .soulkeys preset file into My Presets");
+    r.importPreset.onClick = [this, z]
+    {
+        chooser = std::make_unique<juce::FileChooser> ("Import a Soul Keys preset", juce::File::getSpecialLocation (juce::File::userHomeDirectory).getChildFile ("Downloads"), "*" + PresetFile::extension());
+        chooser->launchAsync (juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles | juce::FileBrowserComponent::canSelectMultipleItems,
+                              [this, z] (const juce::FileChooser& fc)
+                              {
+                                  int ok = 0;
+                                  juce::String lastError;
+                                  for (auto& f : fc.getResults())
+                                  {
+                                      const auto error = processor.importPreset (f, z);
+                                      if (error.isEmpty()) ++ok; else lastError = f.getFileName() + ": " + error;
+                                  }
+                                  refreshSetList (0, true);
+                                  refreshSetList (1, true);
+                                  if (ok > 0) showStatus ("Imported " + juce::String (ok) + " preset(s) into My Presets." + (lastError.isNotEmpty() ? "  " + lastError : ""));
+                                  else if (lastError.isNotEmpty()) showStatus (lastError);
+                              });
+    };
+    addAndMakeVisible (r.savePreset);
+    addAndMakeVisible (r.importPreset);
+
     r.map = std::make_unique<ChordMapView> (processor, z);
     addAndMakeVisible (*r.map);
+}
+
+void SoulKeysEditor::askToSavePreset (int z)
+{
+    auto current = processor.chordSetName (z, juce::roundToInt (processor.apvts.getRawParameterValue (SoulKeysProcessor::pid (z, "chordSet"))->load()));
+    current = current.fromFirstOccurrenceOf ("From file: ", false, false).isNotEmpty() ? current.fromFirstOccurrenceOf ("From file: ", false, false)
+            : current.startsWith ("My: ") ? current.substring (4)
+            : current.retainCharacters ("0123456789").length() >= 2 && current[2] == ' ' ? current.substring (4).upToFirstOccurrenceOf ("  (", false, false)
+            : current;
+    auto* w = new juce::AlertWindow ("Save as a preset", "Name for these chords (saved in My Presets):", juce::MessageBoxIconType::NoIcon, this);
+    w->addTextEditor ("name", current.trim() + " (mine)");
+    w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    juce::Component::SafePointer<SoulKeysEditor> safe (this);
+    w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, w, z] (int result)
+    {
+        if (safe == nullptr || result != 1) return;
+        const auto name = w->getTextEditorContents ("name").trim();
+        if (name.isEmpty()) { safe->showStatus ("Give the preset a name."); return; }
+        const auto error = safe->processor.saveZoneAsPreset (z, name);
+        safe->refreshSetList (0, true);
+        safe->refreshSetList (1, true);
+        safe->showStatus (error.isEmpty() ? "Saved \"" + name + "\" to My Presets (" + PresetFile::folder().getFullPathName() + ")." : error);
+    }), true);
+}
+
+//==============================================================================
+// Recorder
+
+void SoulKeysEditor::finishTake()
+{
+    processor.drainRecording (take);
+    showStatus (take.empty() ? "Nothing was recorded." : "Take ready: " + takeSummary() + ". Drag DRAG MIDI onto a MIDI track, or SAVE MIDI.");
+}
+
+juce::String SoulKeysEditor::takeSummary() const
+{
+    int notes = 0;
+    double first = 1.0e9, last = 0.0;
+    for (auto& e : take)
+        if (e.on) { ++notes; first = std::min (first, e.time); last = std::max (last, e.time); }
+    if (notes == 0) return "empty";
+    const int secs = (int) std::ceil (last - first);
+    return juce::String (notes) + " notes, " + juce::String (secs / 60) + ":" + juce::String (secs % 60).paddedLeft ('0', 2)
+           + " at " + juce::String (juce::roundToInt (takeBpm)) + " BPM";
+}
+
+juce::File SoulKeysEditor::writeTake (const juce::File& file) const
+{
+    if (take.empty()) return {};
+    auto events = take;
+    std::stable_sort (events.begin(), events.end(), [] (auto& a, auto& b) { return a.time < b.time; });
+    double start = 0.0;
+    for (auto& e : events) if (e.on) { start = e.time; break; } // the take starts at the first note
+    const int ppq = 960;
+    const double ticksPerSecond = takeBpm / 60.0 * ppq;
+    juce::MidiMessageSequence seq;
+    seq.addEvent (juce::MidiMessage::tempoMetaEvent ((int) std::lround (60000000.0 / takeBpm)), 0.0);
+    seq.addEvent (juce::MidiMessage::textMetaEvent (3, "Rashon Soul Keys take"), 0.0);
+    std::array<int, 128> open {};
+    double end = 0.0;
+    for (auto& e : events)
+    {
+        const double t = std::max (0.0, (e.time - start) * ticksPerSecond);
+        end = std::max (end, t);
+        if (e.on) { seq.addEvent (juce::MidiMessage::noteOn (1, e.note, juce::jlimit (0.05f, 1.0f, e.velocity)), t); ++open[(size_t) e.note]; }
+        else if (open[(size_t) e.note] > 0) { seq.addEvent (juce::MidiMessage::noteOff (1, e.note), t); --open[(size_t) e.note]; }
+    }
+    for (int n = 0; n < 128; ++n) // close anything still held when recording stopped
+        while (open[(size_t) n]-- > 0) seq.addEvent (juce::MidiMessage::noteOff (1, n), end + ppq / 4);
+    seq.updateMatchedPairs();
+    juce::MidiFile mf;
+    mf.setTicksPerQuarterNote (ppq);
+    mf.addTrack (seq);
+    file.deleteFile();
+    juce::FileOutputStream out (file);
+    if (! out.openedOk() || ! mf.writeTo (out, 1)) return {};
+    return file;
+}
+
+juce::File SoulKeysEditor::takeFileForDrag()
+{
+    if (processor.isRecording()) { processor.stopRecording(); finishTake(); }
+    if (take.empty()) { showStatus ("Record something first."); return {}; }
+    lastDragFile = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                       .getChildFile ("Soul Keys take " + juce::Time::getCurrentTime().formatted ("%H-%M-%S") + ".mid");
+    return writeTake (lastDragFile);
 }
 
 void SoulKeysEditor::refreshSetList (int z, bool force)
@@ -416,6 +591,7 @@ void SoulKeysEditor::refreshSetList (int z, bool force)
     const bool hasUser = processor.hasUserChords (z);
     if (! force && r.listed == processor.numChordSets() && r.listedUser == hasUser)
         return;
+    // Separator text for My Presets is part of the names ("My: ...")
     const int selected = r.setBox.getSelectedItemIndex();
     r.setBox.clear (juce::dontSendNotification);
     for (int i = 0; i < processor.numChordSets(); ++i)
@@ -470,7 +646,7 @@ void SoulKeysEditor::applySkinColours()
         r.octValue.setColour (juce::Label::textColourId, s.text);
     }
     keyboard.setSkin (s);
-    for (auto* l : { &skinCaption, &splitCaption, &splitAtCaption, &strumLabel, &bassLabel, &leadingLabel, &chordModeLabel })
+    for (auto* l : { &skinCaption, &splitCaption, &splitAtCaption, &strumLabel, &bassLabel, &leadingLabel, &chordModeLabel, &recCaption, &takeInfo })
         l->setColour (juce::Label::textColourId, s.dim);
     splitHint.setColour (juce::Label::textColourId, s.dim);
     status.setColour (juce::Label::textColourId, s.dim);
@@ -483,13 +659,17 @@ void SoulKeysEditor::applySkinColours()
             k->label.setColour (juce::Label::textColourId, s.dim);
         }
     soundTabB.setColour (juce::TextButton::textColourOnId, contrast (s.accent2));
+    recButton.setColour (juce::TextButton::textColourOnId, contrast (s.accent2));
     for (auto* b : rows[1].ext)
         b->setColour (juce::TextButton::textColourOnId, contrast (s.accent2));
 }
 
 bool SoulKeysEditor::isInterestedInFileDrag (const juce::StringArray& files)
 {
-    return files.size() == 1 && juce::File (files[0]).hasFileExtension ("mid;midi;wav;aif;aiff;flac;mp3;ogg");
+    for (auto& f : files)
+        if (! juce::File (f).hasFileExtension ("mid;midi;wav;aif;aiff;flac;mp3;ogg;soulkeys"))
+            return false;
+    return ! files.isEmpty();
 }
 
 void SoulKeysEditor::filesDropped (const juce::StringArray& files, int, int y)
@@ -497,12 +677,22 @@ void SoulKeysEditor::filesDropped (const juce::StringArray& files, int, int y)
     if (files.isEmpty()) return;
     // Dropped on zone B's area (and split is on) -> zone B, otherwise zone A
     const int zone = processor.splitOn() && y >= rows[1].area.getY() && y < rows[1].area.getBottom() ? 1 : 0;
+    if (juce::File (files[0]).hasFileExtension ("soulkeys"))
+    {
+        int ok = 0;
+        for (auto& f : files)
+            if (processor.importPreset (juce::File (f), zone).isEmpty()) ++ok;
+        refreshSetList (0, true);
+        refreshSetList (1, true);
+        showStatus ("Imported " + juce::String (ok) + " preset(s) into My Presets.");
+        return;
+    }
     loadChordsFrom (juce::File (files[0]), zone);
 }
 
 void SoulKeysEditor::loadChordsFrom (const juce::File& file, int zone)
 {
-    status.setText ("Listening to " + file.getFileName() + "...", juce::dontSendNotification);
+    showStatus ("Listening to " + file.getFileName() + "...");
     juce::Component::SafePointer<SoulKeysEditor> safe (this);
     juce::Thread::launch ([safe, file, zone]
     {
@@ -512,20 +702,30 @@ void SoulKeysEditor::loadChordsFrom (const juce::File& file, int zone)
             if (safe == nullptr) return;
             if (result.error.isNotEmpty())
             {
-                safe->status.setText (result.error, juce::dontSendNotification);
+                safe->showStatus (result.error);
                 return;
             }
             safe->processor.setUserChords (zone, result.set);
             safe->refreshSetList (zone, true);
-            safe->status.setText ("Found " + juce::String (result.chordsFound) + " chords in " + file.getFileName()
+            safe->showStatus ("Found " + juce::String (result.chordsFound) + " chords in " + file.getFileName()
                                   + " for zone " + (zone == 0 ? "A" : "B")
-                                  + (result.chordsFound < 12 ? ". The other keys got related chords." : "."), juce::dontSendNotification);
+                                  + (result.chordsFound < 12 ? ". The other keys got related chords." : "."));
         });
     });
 }
 
 void SoulKeysEditor::timerCallback()
 {
+    if (processor.isRecording())
+    {
+        processor.drainRecording (take);
+        takeInfo.setText ("Recording...  " + takeSummary(), juce::dontSendNotification);
+    }
+    else
+        takeInfo.setText (take.empty() ? "Press REC, play, then STOP. Drag the take into your DAW." : "Take: " + takeSummary(), juce::dontSendNotification);
+    recButton.setToggleState (processor.isRecording(), juce::dontSendNotification);
+    recButton.setButtonText (processor.isRecording() ? "REC  *" : "REC");
+
     const bool split = processor.splitOn();
     for (int z = 0; z < SoulKeysProcessor::numZones; ++z)
     {
@@ -538,6 +738,8 @@ void SoulKeysEditor::timerCallback()
         const int oct = juce::roundToInt (processor.apvts.getRawParameterValue (pid ("octave"))->load());
         r.octValue.setText (oct > 0 ? "+" + juce::String (oct) : juce::String (oct), juce::dontSendNotification);
         const int set = juce::roundToInt (processor.apvts.getRawParameterValue (pid ("chordSet"))->load());
+        if (r.setBox.getSelectedItemIndex() != set && set < r.setBox.getNumItems())
+            r.setBox.setSelectedItemIndex (set, juce::dontSendNotification);
         r.scaleBox.setEnabled (set == SoulKeysProcessor::scaleSlot);
         r.map->refresh();
     }
@@ -628,7 +830,9 @@ void SoulKeysEditor::layoutZoneRow (int z, int y)
     auto& r = rows[(size_t) z];
     r.area = { 12, y - 4, W - 24, 184 };
     panels.push_back ({ r.area, {}, z == 1 });
-    r.title.setBounds (22, y + 12, 160, 20);
+    r.title.setBounds (22, y + 2, 160, 18);
+    r.savePreset.setBounds (22, y + 22, 92, 24);
+    r.importPreset.setBounds (116, y + 22, 62, 24);
     const int cy = y + 4, ry = y + 18;
     r.setCaption.setBounds (186, cy, 120, 12);
     r.prev.setBounds (186, ry, 26, 26);
@@ -696,11 +900,19 @@ void SoulKeysEditor::resized()
     int x = 360;
     for (auto [l, t] : { std::pair { &bassLabel, &bassToggle }, { &leadingLabel, &leadingToggle }, { &chordModeLabel, &chordModeToggle } })
     {
-        l->setBounds (x, py + 32, 110, 14);
+        l->setBounds (x, py + 32, 100, 14);
         t->setBounds (x, py + 52, 56, 24);
-        x += 120;
+        x += 104;
     }
-    status.setBounds (x + 10, py + 30, W - 36 - x - 10, 50);
+    // Recorder
+    const int rx = 690;
+    recCaption.setBounds (rx, py + 24, 200, 14);
+    recButton.setBounds (rx, py + 42, 64, 28);
+    stopButton.setBounds (rx + 68, py + 42, 60, 28);
+    clearButton.setBounds (rx + 132, py + 42, 60, 28);
+    dragButton.setBounds (rx + 196, py + 42, 120, 28);
+    saveMidiButton.setBounds (rx + 320, py + 42, 120, 28);
+    takeInfo.setBounds (rx, py + 74, W - 24 - rx, 18);
 
     keyboard.setBounds (12, py + ph + 8, W - 24, H - (py + ph + 8) - 8);
     keyboard.setKeyWidth ((float) (W - 24) / 36.0f);

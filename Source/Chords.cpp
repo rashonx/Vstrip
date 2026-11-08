@@ -188,6 +188,66 @@ namespace Voicing
     }
 }
 
+namespace Voicing
+{
+    Chord parseName (const juce::String& nameIn)
+    {
+        Chord c;
+        auto text = nameIn.trim().replace (juce::CharPointer_UTF8 ("\xe2\x99\xad"), "b").replace (juce::CharPointer_UTF8 ("\xe2\x99\xaf"), "#");
+        if (text.isEmpty()) return c;
+        const auto letter = juce::CharacterFunctions::toUpperCase (text[0]);
+        const int letterPc = letter == 'C' ? 0 : letter == 'D' ? 2 : letter == 'E' ? 4 : letter == 'F' ? 5 : letter == 'G' ? 7 : letter == 'A' ? 9 : letter == 'B' ? 11 : -1;
+        if (letterPc < 0) return c;
+        int root = letterPc, i = 1;
+        if (i < text.length() && (text[i] == '#' || text[i] == 'b'))  // one sharp or flat right after the letter
+        {
+            root += text[i] == '#' ? 1 : -1;
+            ++i;
+        }
+        root = (root % 12 + 12) % 12;
+        auto suffix = text.substring (i).upToFirstOccurrenceOf ("/", false, false); // ignore slash bass
+        suffix = suffix.replace (juce::CharPointer_UTF8 ("\xce\x94"), "maj").replace (juce::CharPointer_UTF8 ("\xc2\xb0"), "dim")
+                       .replace (juce::CharPointer_UTF8 ("\xc3\xb8"), "m7b5").removeCharacters ("() ").toLowerCase();
+
+        static const std::vector<std::pair<const char*, int>> aliases {
+            { "", ChordQ::add9 }, { "maj", ChordQ::M7 }, { "maj7", ChordQ::M7 }, { "ma7", ChordQ::M7 }, 
+            { "maj9", ChordQ::M9 }, { "ma9", ChordQ::M9 }, { "maj9#11", ChordQ::M9s11 }, { "maj7#11", ChordQ::M9s11 }, { "lyd", ChordQ::M9s11 },
+            { "6/9", ChordQ::M69 }, { "69", ChordQ::M69 }, { "6", ChordQ::M69 }, { "add9", ChordQ::add9 }, { "add2", ChordQ::add9 },
+            { "maj7#5", ChordQ::M7s5 }, { "aug", ChordQ::M7s5 }, { "+", ChordQ::M7s5 },
+            { "m", ChordQ::m7 }, { "min", ChordQ::m7 }, { "-", ChordQ::m7 }, { "m7", ChordQ::m7 }, { "min7", ChordQ::m7 }, { "-7", ChordQ::m7 },
+            { "m9", ChordQ::m9 }, { "min9", ChordQ::m9 }, { "-9", ChordQ::m9 }, { "m11", ChordQ::m11 }, { "min11", ChordQ::m11 }, { "-11", ChordQ::m11 },
+            { "m6/9", ChordQ::m69 }, { "m69", ChordQ::m69 }, { "m6", ChordQ::m69 }, { "mmaj9", ChordQ::mM9 }, { "mmaj7", ChordQ::mM9 }, { "mm9", ChordQ::mM9 },
+            { "7", ChordQ::d7 }, { "dom7", ChordQ::d7 }, { "9", ChordQ::d9 }, { "13", ChordQ::d13 }, { "7#9", ChordQ::d7s9 }, { "7+9", ChordQ::d7s9 },
+            { "13b9", ChordQ::d13b9 }, { "7b9", ChordQ::d13b9 }, { "7alt", ChordQ::d7alt }, { "alt", ChordQ::d7alt }, { "9#11", ChordQ::d9s11 },
+            { "7#11", ChordQ::d9s11 }, { "13#11", ChordQ::d9s11 }, { "11", ChordQ::d11 },
+            { "7sus4", ChordQ::sus7 }, { "7sus", ChordQ::sus7 }, { "sus", ChordQ::sus9 }, { "sus4", ChordQ::sus9 }, { "sus2", ChordQ::sus9 },
+            { "9sus4", ChordQ::sus9 }, { "9sus", ChordQ::sus9 }, { "13sus4", ChordQ::sus13 }, { "13sus", ChordQ::sus13 },
+            { "m7b5", ChordQ::m7b5 }, { "min7b5", ChordQ::m7b5 }, { "-7b5", ChordQ::m7b5 }, { "m9b5", ChordQ::h9 }, { "m11b5", ChordQ::m11b5 },
+            { "dim", ChordQ::dim7 }, { "dim7", ChordQ::dim7 }, { "o", ChordQ::dim7 }, { "o7", ChordQ::dim7 },
+        };
+        for (const auto& [alias, q] : aliases)
+            if (suffix == alias)
+            {
+                c.root = root;
+                c.quality = q;
+                c.notes = make (root, q, true, 62, nullptr);
+                c.name = name (root, q);
+                return c;
+            }
+        // Also accept our own display names exactly ("maj9(#11)" etc. without the brackets)
+        for (int q = 0; q < ChordQ::numQualities; ++q)
+            if (juce::String (ChordQ::info (q).suffix).removeCharacters ("() ").toLowerCase() == suffix)
+            {
+                c.root = root;
+                c.quality = q;
+                c.notes = make (root, q, true, 62, nullptr);
+                c.name = name (root, q);
+                return c;
+            }
+        return c;
+    }
+}
+
 namespace ChordPresets
 {
     using namespace ChordQ;
