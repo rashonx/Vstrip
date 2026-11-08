@@ -3,6 +3,7 @@
 #include "../Source/ChordExtractor.h"
 #include "../Source/PresetFile.h"
 #include <thread>
+#include <set>
 
 namespace
 {
@@ -233,6 +234,21 @@ int main()
             if (PresetFile::load (f, set, error)) ++ok; else errors << f.getFileName() << ": " << error << " ";
         }
         check (ok == 3, "bonus presets load", errors);
+
+        // Preset Pack 2: all 50 load, every key gets a full chord, names don't clash with the factory presets
+        int packOk = 0, fullKeys = 0;
+        juce::String packErrors;
+        std::set<juce::String> packNames;
+        for (auto& f : juce::File::getCurrentWorkingDirectory().getChildFile ("Preset Pack 2").findChildFiles (juce::File::findFiles, false, "*.soulkeys"))
+        {
+            ChordSet set; juce::String error;
+            if (! PresetFile::load (f, set, error)) { packErrors << f.getFileName() << ": " << error << "  "; continue; }
+            ++packOk;
+            packNames.insert (set.name);
+            for (auto& c : set.chords) if (c.notes.size() >= 4 && c.root >= 0) ++fullKeys;
+        }
+        check (packOk == 50 && fullKeys == 600 && packNames.size() == 50, "preset pack 2: 50 presets, 600 full chords",
+               juce::String (packOk) + " presets, " + juce::String (fullKeys) + " chords " + packErrors);
 
         SoulKeysProcessor k;
         const auto before = k.numChordSets();

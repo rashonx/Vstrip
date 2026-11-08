@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "71  Rose Gold  (Eb)",
+  "tonic": "Eb",
+  "white": [
+    "Ebmaj9(#11)",
+    "Cm9(b5)",
+    "F13(b9)",
+    "Bbm11",
+    "Abm9",
+    "Db13",
+    "Gbmaj9"
+  ],
+  "flavours": "SCTSD"
+}

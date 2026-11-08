@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "97  Prayer Closet  (Eb)",
+  "tonic": "Eb",
+  "white": [
+    "Ebmaj9",
+    "Abadd9",
+    "Bbm9",
+    "Cm11",
+    "F13sus4",
+    "F7(#9)",
+    "Ddim7"
+  ],
+  "flavours": "DSUDS"
+}

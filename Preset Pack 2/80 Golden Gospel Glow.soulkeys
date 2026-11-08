@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "80  Golden Gospel Glow  (G)",
+  "tonic": "G",
+  "white": [
+    "Gmaj9",
+    "D13sus4",
+    "Em9",
+    "C6/9",
+    "B7(#9)",
+    "Am11",
+    "Abdim7"
+  ],
+  "flavours": "DUSDS"
+}

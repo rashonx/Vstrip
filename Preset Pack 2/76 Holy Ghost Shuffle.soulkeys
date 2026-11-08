@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "76  Holy Ghost Shuffle  (C)",
+  "tonic": "C",
+  "white": [
+    "C9",
+    "Edim7",
+    "F9",
+    "Gbdim7",
+    "G13",
+    "Am9",
+    "Dm11"
+  ],
+  "flavours": "DSDSS"
+}

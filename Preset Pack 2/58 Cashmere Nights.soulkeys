@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "58  Cashmere Nights  (B)",
+  "tonic": "B",
+  "white": [
+    "Bm9",
+    "Em11",
+    "Gb7alt",
+    "A13",
+    "Dmaj9",
+    "Gmaj7(#5)",
+    "Cm9(b5)"
+  ],
+  "flavours": "TSCST"
+}

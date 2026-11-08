@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "86  Coastline Cruise  (C)",
+  "tonic": "C",
+  "white": [
+    "Cmaj9(#11)",
+    "D13",
+    "Em11",
+    "Am9",
+    "F6/9",
+    "G13sus4",
+    "Bb9"
+  ],
+  "flavours": "SCSTU"
+}

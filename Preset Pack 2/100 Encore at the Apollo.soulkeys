@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "100  Encore at the Apollo  (G)",
+  "tonic": "G",
+  "white": [
+    "Gmaj9",
+    "B7(#9)",
+    "Em9",
+    "A13",
+    "D9",
+    "Cmaj9(#11)",
+    "Fdim7"
+  ],
+  "flavours": "SCSTD"
+}

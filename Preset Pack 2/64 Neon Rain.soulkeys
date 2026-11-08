@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "64  Neon Rain  (Bb)",
+  "tonic": "Bb",
+  "white": [
+    "Bbm9",
+    "Gbmaj9(#11)",
+    "Ab13",
+    "Dbm11",
+    "Eb7alt",
+    "Bmaj9",
+    "E9(#11)"
+  ],
+  "flavours": "TCSTS"
+}

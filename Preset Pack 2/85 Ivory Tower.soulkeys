@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "85  Ivory Tower  (Eb)",
+  "tonic": "Eb",
+  "white": [
+    "Ebm(maj9)",
+    "Abm9",
+    "Db13",
+    "Gbmaj9(#11)",
+    "Bmaj9",
+    "Fm9(b5)",
+    "Bb7alt"
+  ],
+  "flavours": "STCTS"
+}

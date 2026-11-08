@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "61  Brownstone Choir  (D)",
+  "tonic": "D",
+  "white": [
+    "D6/9",
+    "Gbm7",
+    "Gmaj9",
+    "Abdim7",
+    "Dbm11",
+    "A13sus4",
+    "B13(b9)"
+  ],
+  "flavours": "DSDSU"
+}

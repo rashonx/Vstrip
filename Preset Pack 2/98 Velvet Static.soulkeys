@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "98  Velvet Static  (B)",
+  "tonic": "B",
+  "white": [
+    "Bmaj9",
+    "Dbm9",
+    "Abm11",
+    "Ebm7",
+    "Gb13",
+    "Emaj9(#11)",
+    "A13sus4"
+  ],
+  "flavours": "CTSCU"
+}

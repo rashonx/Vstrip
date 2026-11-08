@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "65  Saturday Choir Run  (G)",
+  "tonic": "G",
+  "white": [
+    "G9",
+    "C6/9",
+    "Dbdim7",
+    "Gmaj9",
+    "Em11",
+    "A13sus4",
+    "A13(b9)"
+  ],
+  "flavours": "DSDSU"
+}

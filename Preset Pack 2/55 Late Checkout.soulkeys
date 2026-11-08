@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "55  Late Checkout  (A)",
+  "tonic": "A",
+  "white": [
+    "Amaj9(#11)",
+    "Dbm9",
+    "Gbm11",
+    "B13",
+    "Emaj9",
+    "Abm9(b5)",
+    "Db7(#9)"
+  ],
+  "flavours": "CSTSD"
+}

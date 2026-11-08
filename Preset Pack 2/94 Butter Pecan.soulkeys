@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "94  Butter Pecan  (Ab)",
+  "tonic": "Ab",
+  "white": [
+    "Ab6/9",
+    "Fm9",
+    "Bbm11",
+    "Eb13",
+    "Dbmaj9",
+    "C7(#9)",
+    "Gb9sus4"
+  ],
+  "flavours": "SDSCU"
+}

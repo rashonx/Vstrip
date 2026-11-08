@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "77  Blue Velvet Couch  (A)",
+  "tonic": "A",
+  "white": [
+    "Am11",
+    "Dmaj9",
+    "G9(#11)",
+    "Em9",
+    "Cmaj9(#11)",
+    "B7alt",
+    "Am6/9"
+  ],
+  "flavours": "TCSTC"
+}

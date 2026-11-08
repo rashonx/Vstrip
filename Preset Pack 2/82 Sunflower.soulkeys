@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "82  Sunflower  (D)",
+  "tonic": "D",
+  "white": [
+    "Dmaj9",
+    "Gbm11",
+    "Gmaj9(#11)",
+    "A13",
+    "Em9",
+    "Dbm7",
+    "B9sus4"
+  ],
+  "flavours": "CSTSU"
+}

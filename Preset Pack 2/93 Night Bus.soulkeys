@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "93  Night Bus  (Gb)",
+  "tonic": "Gb",
+  "white": [
+    "Gbm9",
+    "Dmaj9",
+    "E13",
+    "Bm11",
+    "Amaj9(#11)",
+    "G7(#9)",
+    "Dbm9(b5)"
+  ],
+  "flavours": "STCSD"
+}

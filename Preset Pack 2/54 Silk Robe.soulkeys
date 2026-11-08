@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "54  Silk Robe  (G)",
+  "tonic": "G",
+  "white": [
+    "Gm9",
+    "Bbmaj7",
+    "C13",
+    "Fmaj9",
+    "Ebmaj9(#11)",
+    "A7alt",
+    "Dm11"
+  ],
+  "flavours": "STCSS"
+}

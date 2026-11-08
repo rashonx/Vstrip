@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "51  Velvet Sermon  (Db)",
+  "tonic": "Db",
+  "white": [
+    "Db6/9",
+    "Gbmaj9",
+    "Gdim7",
+    "Abm9",
+    "Bm11",
+    "E13sus4",
+    "E13(b9)"
+  ],
+  "flavours": "DSDUS"
+}

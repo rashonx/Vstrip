@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "70  Sanctuary Steps  (Ab)",
+  "tonic": "Ab",
+  "white": [
+    "Abmaj9",
+    "Bbm9",
+    "Bdim7",
+    "Cm11",
+    "Db6/9",
+    "Eb13sus4",
+    "Eb13(b9)"
+  ],
+  "flavours": "DSDSU"
+}

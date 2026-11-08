@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "87  Smoke Ring  (B)",
+  "tonic": "B",
+  "white": [
+    "Bm11",
+    "D13",
+    "Gmaj9",
+    "C7(#9)",
+    "Fm9",
+    "Amaj9(#11)",
+    "Em9(b5)"
+  ],
+  "flavours": "CTSCS"
+}

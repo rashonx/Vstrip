@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "68  Garden Party  (A)",
+  "tonic": "A",
+  "white": [
+    "A6/9",
+    "Bm9",
+    "Dbm11",
+    "Dmaj9",
+    "E9",
+    "Gbm7",
+    "Ab7(#9)"
+  ],
+  "flavours": "CSDSU"
+}

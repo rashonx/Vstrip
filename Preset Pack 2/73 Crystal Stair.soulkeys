@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "73  Crystal Stair  (B)",
+  "tonic": "B",
+  "white": [
+    "Bmaj9",
+    "Bbm9(b5)",
+    "Eb13(b9)",
+    "Abm11",
+    "Db9",
+    "Gbmaj9(#11)",
+    "Edim7"
+  ],
+  "flavours": "SDCST"
+}

@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "62  Smoky Mirror  (Gb)",
+  "tonic": "Gb",
+  "white": [
+    "Gbm11",
+    "B9",
+    "Em9",
+    "G7(#9)",
+    "Dmaj9(#11)",
+    "Amaj9",
+    "Cm9(b5)"
+  ],
+  "flavours": "CTSCS"
+}

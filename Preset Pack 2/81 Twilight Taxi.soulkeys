@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "81  Twilight Taxi  (Db)",
+  "tonic": "Db",
+  "white": [
+    "Dbm11",
+    "B13(b9)",
+    "Amaj9",
+    "Em9",
+    "G13",
+    "Cmaj9(#11)",
+    "Gb7alt"
+  ],
+  "flavours": "TSCTS"
+}

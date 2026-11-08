@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "60  Amber Waves  (Ab)",
+  "tonic": "Ab",
+  "white": [
+    "Abadd9",
+    "Ebm11",
+    "Dbm9",
+    "Amaj9",
+    "Gb9sus4",
+    "B6/9",
+    "E13"
+  ],
+  "flavours": "SUCSD"
+}

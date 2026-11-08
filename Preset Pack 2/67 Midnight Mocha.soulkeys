@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "67  Midnight Mocha  (C)",
+  "tonic": "C",
+  "white": [
+    "Cm11",
+    "Ebmaj9",
+    "Abmaj9(#11)",
+    "Bb9sus4",
+    "G7alt",
+    "Fm9",
+    "Dm9(b5)"
+  ],
+  "flavours": "STCSS"
+}

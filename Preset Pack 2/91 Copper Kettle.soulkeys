@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "91  Copper Kettle  (D)",
+  "tonic": "D",
+  "white": [
+    "Dm9",
+    "Gm11",
+    "Cmaj9",
+    "F9(#11)",
+    "Bbmaj7(#5)",
+    "A7alt",
+    "Em9(b5)"
+  ],
+  "flavours": "SCTSS"
+}

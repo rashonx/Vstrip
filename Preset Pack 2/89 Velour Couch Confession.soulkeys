@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "89  Velour Couch Confession  (Bb)",
+  "tonic": "Bb",
+  "white": [
+    "Bbm9",
+    "Dbmaj9(#11)",
+    "Gb13",
+    "Bmaj9",
+    "Abm11",
+    "Eb7(#9)",
+    "Fm9(b5)"
+  ],
+  "flavours": "TSCTD"
+}

@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "88  Easy Like Sunday  (G)",
+  "tonic": "G",
+  "white": [
+    "Gadd9",
+    "Bm9",
+    "Em11",
+    "Cmaj9",
+    "D9sus4",
+    "Am7",
+    "F6/9"
+  ],
+  "flavours": "SDCSU"
+}

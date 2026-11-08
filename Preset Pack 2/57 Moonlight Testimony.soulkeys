@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "57  Moonlight Testimony  (Eb)",
+  "tonic": "Eb",
+  "white": [
+    "Ebmaj9",
+    "Gdim7",
+    "Abm9",
+    "Db13sus4",
+    "B6/9",
+    "Cm9(b5)",
+    "F13(b9)"
+  ],
+  "flavours": "DSDUS"
+}

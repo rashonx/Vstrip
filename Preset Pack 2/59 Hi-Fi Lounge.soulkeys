@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "59  Hi-Fi Lounge  (C)",
+  "tonic": "C",
+  "white": [
+    "Cmaj7",
+    "Em11",
+    "Am9",
+    "D9",
+    "Fmaj9(#11)",
+    "Bb13",
+    "G9sus4"
+  ],
+  "flavours": "SCSTU"
+}

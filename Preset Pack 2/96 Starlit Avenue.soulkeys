@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "96  Starlit Avenue  (F)",
+  "tonic": "F",
+  "white": [
+    "Fm11",
+    "Ebmaj9",
+    "Dbmaj9(#11)",
+    "Ab6/9",
+    "Gb13",
+    "C7(#9)",
+    "Bbm9"
+  ],
+  "flavours": "TCSTS"
+}

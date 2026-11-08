@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "84  Revival Night  (F)",
+  "tonic": "F",
+  "white": [
+    "F6/9",
+    "Bbmaj9",
+    "Em9(b5)",
+    "A7(#9)",
+    "Dm9",
+    "Gm11",
+    "C13sus4"
+  ],
+  "flavours": "DSDSU"
+}

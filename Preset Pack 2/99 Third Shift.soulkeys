@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "99  Third Shift  (D)",
+  "tonic": "D",
+  "white": [
+    "Dm11",
+    "Bbmaj9",
+    "Eb7alt",
+    "Abm9",
+    "Fmaj9(#11)",
+    "C13",
+    "Gm9(b5)"
+  ],
+  "flavours": "STCST"
+}

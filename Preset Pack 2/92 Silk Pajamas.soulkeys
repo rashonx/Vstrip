@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "92  Silk Pajamas  (E)",
+  "tonic": "E",
+  "white": [
+    "Emaj9",
+    "Dbm11",
+    "Abm9",
+    "Amaj9(#11)",
+    "Gb13",
+    "Eb13sus4",
+    "Bm7"
+  ],
+  "flavours": "CSTSU"
+}

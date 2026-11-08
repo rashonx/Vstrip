@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "53  Honeycomb  (Bb)",
+  "tonic": "Bb",
+  "white": [
+    "Bbmaj9",
+    "Cm11",
+    "Dm7",
+    "G7(#9)",
+    "Fm9",
+    "Eb13sus4",
+    "Dbmaj9(#11)"
+  ],
+  "flavours": "SCDSU"
+}

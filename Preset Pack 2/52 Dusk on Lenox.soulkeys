@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "52  Dusk on Lenox  (E)",
+  "tonic": "E",
+  "white": [
+    "Em11",
+    "D13",
+    "Cmaj9(#11)",
+    "Amaj7",
+    "Gmaj9",
+    "Gb9",
+    "Bm7"
+  ],
+  "flavours": "TCSTS"
+}

@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "72  Southern Porch  (D)",
+  "tonic": "D",
+  "white": [
+    "D13",
+    "G9",
+    "A7(#9)",
+    "Fmaj9",
+    "C6/9",
+    "Bm11",
+    "Em9"
+  ],
+  "flavours": "CSSTS"
+}

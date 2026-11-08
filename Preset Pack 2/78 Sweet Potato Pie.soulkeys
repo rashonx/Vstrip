@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "78  Sweet Potato Pie  (Bb)",
+  "tonic": "Bb",
+  "white": [
+    "Bb6/9",
+    "Ebadd9",
+    "Gm7",
+    "Cm9",
+    "Dm11",
+    "F9sus4",
+    "F13"
+  ],
+  "flavours": "SUDSC"
+}

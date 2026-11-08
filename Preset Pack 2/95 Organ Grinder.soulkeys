@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "95  Organ Grinder  (C)",
+  "tonic": "C",
+  "white": [
+    "C13",
+    "F13",
+    "G9",
+    "Bbmaj9",
+    "Ebm11",
+    "Ab9(#11)",
+    "Dbmaj9"
+  ],
+  "flavours": "CSTSC"
+}

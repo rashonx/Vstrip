@@ -33,6 +33,7 @@ jobs:
           Copy-Item "build/SoulKeys_artefacts/Release/Standalone/$name.exe" "$folder/"
           Copy-Item docs/INSTALL.txt "$folder/INSTALL.txt"
           Copy-Item -Recurse "Bonus Presets" "$folder/Bonus Presets"
+          Copy-Item -Recurse "Preset Pack 2" "$folder/Preset Pack 2"
 
       - name: Load test with pluginval
         continue-on-error: true

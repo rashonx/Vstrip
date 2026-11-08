@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "75  Cherry Cola  (F)",
+  "tonic": "F",
+  "white": [
+    "Fm9",
+    "C7(#9)",
+    "Dbmaj9",
+    "Ab13",
+    "Ebm11",
+    "Gbmaj9(#11)",
+    "B9"
+  ],
+  "flavours": "STCST"
+}

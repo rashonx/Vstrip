@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "66  Lavender Lane  (Db)",
+  "tonic": "Db",
+  "white": [
+    "Dbmaj9",
+    "Em9",
+    "Gbm11",
+    "Bm9",
+    "A13sus4",
+    "Gmaj9(#11)",
+    "A7(#9)"
+  ],
+  "flavours": "SCTSD"
+}

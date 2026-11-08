@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "83  Plush Booth  (Ab)",
+  "tonic": "Ab",
+  "white": [
+    "Abm9",
+    "Db9",
+    "Ebm11",
+    "Gbmaj7",
+    "A6/9",
+    "B13",
+    "Fmaj9(#11)"
+  ],
+  "flavours": "STSCS"
+}

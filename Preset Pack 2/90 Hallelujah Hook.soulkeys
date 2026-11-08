@@ -1,0 +1,16 @@
+{
+  "format": "Rashon Soul Keys preset",
+  "version": 1,
+  "name": "90  Hallelujah Hook  (A)",
+  "tonic": "A",
+  "white": [
+    "Amaj9",
+    "Bbdim7",
+    "Bm9",
+    "Cdim7",
+    "Dbm11",
+    "D6/9",
+    "E13(b9)"
+  ],
+  "flavours": "DSDSS"
+}
