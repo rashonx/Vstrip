@@ -23,12 +23,15 @@ class ChordMapView : public juce::Component
 public:
     ChordMapView (SoulKeysProcessor& p, int zoneIndex) : processor (p), zone (zoneIndex) {}
     void setSkin (const KeysSkin& s) { skin = &s; repaint(); }
+    void setSuggestColour (juce::Colour c) { suggestColour = c; repaint(); }
+    const std::array<bool, 12>& getSuggested() const { return suggested; }
     void refresh();
     void paint (juce::Graphics&) override;
 
 private:
     SoulKeysProcessor& processor;
     const int zone;
+    juce::Colour suggestColour { 0xff3ddc97 };
     const KeysSkin* skin = &KeysSkin::all().front();
     std::array<juce::String, 12> names, noteText;
     std::array<bool, 12> held {}, suggested {};
@@ -42,6 +45,12 @@ class ZoneKeyboard : public juce::MidiKeyboardComponent
 public:
     ZoneKeyboard (juce::MidiKeyboardState& s, SoulKeysProcessor& p) : MidiKeyboardComponent (s, horizontalKeyboard), processor (p) {}
     void setSkin (const KeysSkin& s) { skin = &s; repaint(); }
+    void setSuggestions (const std::array<bool, 12>& zoneA, const std::array<bool, 12>& zoneB, juce::Colour colour)
+    {
+        if (suggested[0] == zoneA && suggested[1] == zoneB && colour == suggestColour) return;
+        suggested[0] = zoneA; suggested[1] = zoneB; suggestColour = colour;
+        repaint();
+    }
 
 protected:
     void drawWhiteNote (int note, juce::Graphics&, juce::Rectangle<float> area, bool isDown, bool isOver, juce::Colour lineColour, juce::Colour textColour) override;
@@ -49,8 +58,31 @@ protected:
 
 private:
     juce::Colour zoneColour (int note) const;
+    bool isSuggested (int note) const;
     SoulKeysProcessor& processor;
     const KeysSkin* skin = &KeysSkin::all().front();
+    std::array<std::array<bool, 12>, 2> suggested {};
+    juce::Colour suggestColour { 0xff3ddc97 };
+};
+
+// A small colour square you can click
+class SwatchButton : public juce::Button
+{
+public:
+    explicit SwatchButton (juce::Colour c) : juce::Button ({}), colour (c) {}
+    juce::Colour colour;
+    bool selected = false;
+    void paintButton (juce::Graphics& g, bool over, bool) override
+    {
+        auto r = getLocalBounds().toFloat().reduced (2.0f);
+        g.setColour (colour);
+        g.fillRoundedRectangle (r, 4.0f);
+        if (selected || over)
+        {
+            g.setColour (selected ? juce::Colours::white : juce::Colours::white.withAlpha (0.5f));
+            g.drawRoundedRectangle (r.expanded (1.5f), 5.0f, selected ? 2.5f : 1.5f);
+        }
+    }
 };
 
 // A button you can drag out of the plugin: drops the recorded take as a MIDI file into the DAW.
@@ -166,6 +198,10 @@ private:
     juce::OwnedArray<juce::TextButton> voicingButtons;
     juce::ComboBox topNoteBox, midiOutBox;
     juce::ToggleButton suggestToggle;
+    juce::OwnedArray<SwatchButton> swatches;
+    juce::TextButton customColour { "Custom" };
+    juce::Colour suggestColour { 0xff3ddc97 };
+    void setSuggestColour (juce::Colour c);
     juce::Label voicingCaption, topNoteCaption, suggestCaption, midiOutCaption, midiHint;
     std::unique_ptr<CA> topNoteAtt, midiOutAtt;
     std::unique_ptr<BA> suggestAtt;

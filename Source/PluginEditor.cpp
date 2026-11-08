@@ -151,7 +151,7 @@ void ChordMapView::paint (juce::Graphics& g)
         g.drawFittedText (noteText[(size_t) last], now.reduced (12.0f).withTrimmedTop (64.0f).withHeight (16.0f).toNearestInt(), juce::Justification::topLeft, 1);
         if (suggestionText.isNotEmpty())
         {
-            g.setColour (zoneColour.withAlpha (0.9f));
+            g.setColour (suggestColour);
             g.setFont (juce::FontOptions (11.0f, juce::Font::bold));
             g.drawFittedText (suggestionText, now.reduced (12.0f).withTrimmedTop (82.0f).toNearestInt(), juce::Justification::topLeft, 2);
         }
@@ -173,14 +173,22 @@ void ChordMapView::paint (juce::Graphics& g)
         const bool on = held[(size_t) pc];
         g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.4f) : s.whiteTop, 0.0f, r.getY(), on ? zoneColour : s.whiteBottom, 0.0f, r.getBottom(), false));
         g.fillRoundedRectangle (r, 6.0f);
-        if (suggested[(size_t) pc] && ! on)
+        const bool suggestedKey = suggested[(size_t) pc] && ! on;
+        if (suggestedKey)
         {
-            g.setColour (zoneColour.withAlpha (0.35f));
-            g.fillRoundedRectangle (r.withTrimmedTop (r.getHeight() * 0.55f), 6.0f);
-            g.setColour (zoneColour);
-            g.drawRoundedRectangle (r.reduced (1.5f), 6.0f, 3.0f);
+            g.setGradientFill (juce::ColourGradient (s.whiteTop, 0.0f, r.getY(), suggestColour, 0.0f, r.getBottom(), false));
+            g.fillRoundedRectangle (r, 6.0f);
+            g.setColour (suggestColour);
+            g.drawRoundedRectangle (r.reduced (1.5f), 6.0f, 3.5f);
+            g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
+            g.setColour (contrast (suggestColour));
+            auto tag = juce::Rectangle<float> (38.0f, 15.0f).withPosition (r.getX() + 6.0f, r.getBottom() - 21.0f);
+            g.setColour (suggestColour.darker (0.2f));
+            g.fillRoundedRectangle (tag, 4.0f);
+            g.setColour (contrast (suggestColour));
+            g.drawText ("NEXT", tag, juce::Justification::centred);
         }
-        g.setColour (on ? contrast (zoneColour) : s.whiteText);
+        g.setColour (on ? contrast (zoneColour) : suggestedKey ? contrast (suggestColour.interpolatedWith (s.whiteTop, 0.4f)) : s.whiteText);
         g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
         g.drawFittedText (names[(size_t) pc], r.reduced (5.0f).withTrimmedTop (r.getHeight() * 0.58f).toNearestInt(), juce::Justification::centredTop, 2);
         g.setColour (s.whiteText.withAlpha (0.5f));
@@ -196,12 +204,15 @@ void ChordMapView::paint (juce::Graphics& g)
         const bool on = held[(size_t) pc];
         g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.3f) : s.blackTop, 0.0f, r.getY(), on ? zoneColour : s.blackBottom, 0.0f, r.getBottom(), false));
         g.fillRoundedRectangle (r, 5.0f);
-        if (suggested[(size_t) pc] && ! on)
+        const bool suggestedKey = suggested[(size_t) pc] && ! on;
+        if (suggestedKey)
         {
-            g.setColour (zoneColour);
-            g.drawRoundedRectangle (r.reduced (1.5f), 5.0f, 3.0f);
+            g.setGradientFill (juce::ColourGradient (suggestColour.darker (0.5f), 0.0f, r.getY(), suggestColour, 0.0f, r.getBottom(), false));
+            g.fillRoundedRectangle (r, 5.0f);
+            g.setColour (suggestColour.brighter (0.3f));
+            g.drawRoundedRectangle (r.reduced (1.5f), 5.0f, 2.5f);
         }
-        g.setColour (on ? contrast (zoneColour) : s.blackText);
+        g.setColour (on ? contrast (zoneColour) : suggestedKey ? contrast (suggestColour) : s.blackText);
         g.setFont (juce::FontOptions (10.5f, juce::Font::bold));
         g.drawFittedText (names[(size_t) pc], r.reduced (3.0f).withTrimmedTop (r.getHeight() * 0.4f).toNearestInt(), juce::Justification::centredTop, 3);
     }
@@ -209,6 +220,12 @@ void ChordMapView::paint (juce::Graphics& g)
 
 //==============================================================================
 // Keyboard with zone colours
+
+bool ZoneKeyboard::isSuggested (int note) const
+{
+    const int zone = processor.zoneOf (note);
+    return suggested[(size_t) zone][(size_t) (note % 12)];
+}
 
 juce::Colour ZoneKeyboard::zoneColour (int note) const
 {
@@ -223,6 +240,11 @@ void ZoneKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<f
     g.fillRect (area);
     g.setColour (zc.withAlpha (processor.splitOn() ? 0.16f : 0.06f));
     g.fillRect (area.withTrimmedTop (area.getHeight() * 0.7f));
+    if (isSuggested (note) && ! isDown)
+    {
+        g.setColour (suggestColour.withAlpha (0.75f));
+        g.fillRect (area.withTrimmedTop (area.getHeight() * 0.45f));
+    }
     if (isDown || isOver)
     {
         g.setColour (isDown ? zc : zc.withAlpha (0.3f));
@@ -248,6 +270,11 @@ void ZoneKeyboard::drawBlackNote (int note, juce::Graphics& g, juce::Rectangle<f
     const auto zc = zoneColour (note);
     g.setColour (isDown ? zc : juce::Colour (0xff1c1c1e).interpolatedWith (zc, isOver ? 0.4f : (processor.splitOn() ? 0.18f : 0.06f)));
     g.fillRect (area);
+    if (isSuggested (note) && ! isDown)
+    {
+        g.setColour (suggestColour);
+        g.fillRect (area.withTrimmedTop (area.getHeight() * 0.35f).reduced (1.0f, 0.0f));
+    }
     g.setColour (juce::Colours::white.withAlpha (0.12f));
     g.fillRect (area.reduced (area.getWidth() * 0.15f, 0.0f).withHeight (area.getHeight() * 0.85f).withTrimmedTop (2.0f).withWidth (2.0f));
 }
@@ -390,16 +417,45 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
     topNoteAtt = std::make_unique<CA> (processor.apvts, "topNote", topNoteBox);
     topNoteBox.setTooltip ("Which chord tone sits on top - use it to shape a melody across your chords");
     addAndMakeVisible (topNoteBox);
-    caption (suggestCaption, "SUGGEST NEXT CHORD");
+    caption (suggestCaption, "SUGGEST NEXT CHORD  +  COLOUR");
     suggestAtt = std::make_unique<BA> (processor.apvts, "suggest", suggestToggle);
     addAndMakeVisible (suggestToggle);
+    for (auto c : { 0xff3ddc97u, 0xff3a9bffu, 0xffa970ffu, 0xffff8a3du, 0xffff3fa4u, 0xff2fe0f0u, 0xffb6f03du, 0xffffffffu })
+    {
+        auto* sw = swatches.add (new SwatchButton (juce::Colour (c)));
+        sw->setTooltip ("Colour for suggested next chords");
+        sw->onClick = [this, sw] { setSuggestColour (sw->colour); };
+        addAndMakeVisible (sw);
+    }
+    customColour.setTooltip ("Pick any colour for suggested chords");
+    customColour.onClick = [this]
+    {
+        auto picker = std::make_unique<juce::ColourSelector> (juce::ColourSelector::showColourspace | juce::ColourSelector::showSliders);
+        picker->setCurrentColour (suggestColour, juce::dontSendNotification);
+        picker->setSize (300, 280);
+        struct Listener : juce::ChangeListener
+        {
+            SoulKeysEditor& editor;
+            explicit Listener (SoulKeysEditor& e) : editor (e) {}
+            void changeListenerCallback (juce::ChangeBroadcaster* b) override
+            {
+                if (auto* sel = dynamic_cast<juce::ColourSelector*> (b)) editor.setSuggestColour (sel->getCurrentColour().withAlpha (1.0f));
+            }
+        };
+        static std::unique_ptr<Listener> listener;
+        listener = std::make_unique<Listener> (*this);
+        picker->addChangeListener (listener.get());
+        juce::CallOutBox::launchAsynchronously (std::move (picker), customColour.getScreenBounds(), nullptr);
+    };
+    addAndMakeVisible (customColour);
+
     caption (midiOutCaption, "MIDI OUTPUT");
     midiOutBox.addItemList ({ "Off", "Sound + MIDI", "MIDI only" }, 1);
     midiOutAtt = std::make_unique<CA> (processor.apvts, "midiOut", midiOutBox);
     midiOutBox.setTooltip ("Send the chords out as MIDI to play your own instruments");
     addAndMakeVisible (midiOutBox);
     midiHint.setFont (juce::FontOptions (11.0f));
-    midiHint.setText ("Zone A sends on MIDI channel 1, zone B on channel 2.\nIn your DAW, route this plugin's MIDI out to another instrument.", juce::dontSendNotification);
+    midiHint.setText ("Zone A sends on MIDI channel 1, zone B on channel 2. Route this plugin's MIDI out to another instrument.", juce::dontSendNotification);
     addAndMakeVisible (midiHint);
 
     // Recorder
@@ -450,6 +506,8 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
 
     const auto& state = processor.apvts.state;
     setSkin (state.hasProperty ("skin") ? (int) state.getProperty ("skin") : settings->getIntValue ("skin", 0));
+    setSuggestColour (juce::Colour::fromString (state.hasProperty ("suggestColour") ? state.getProperty ("suggestColour").toString()
+                                                                                     : settings->getValue ("suggestColour", "ff3ddc97")));
     setSize (W, H);
     timerCallback();
     startTimerHz (20);
@@ -696,6 +754,22 @@ void SoulKeysEditor::bindSoundKnobs()
     repaint();
 }
 
+void SoulKeysEditor::setSuggestColour (juce::Colour c)
+{
+    suggestColour = c;
+    processor.apvts.state.setProperty ("suggestColour", c.toString(), nullptr);
+    if (settings != nullptr)
+    {
+        settings->setValue ("suggestColour", c.toString());
+        settings->saveIfNeeded();
+    }
+    for (auto* sw : swatches)
+        sw->selected = sw->colour == c, sw->repaint();
+    for (auto& r : rows)
+        if (r.map) r.map->setSuggestColour (c);
+    repaint();
+}
+
 void SoulKeysEditor::setSkin (int index)
 {
     skinIndex = juce::jlimit (0, (int) KeysSkin::all().size() - 1, index);
@@ -857,6 +931,7 @@ void SoulKeysEditor::timerCallback()
     const int sound = juce::roundToInt (processor.apvts.getRawParameterValue (SoulKeysProcessor::pid (soundZone, "sound"))->load());
     if (soundBox.getSelectedItemIndex() != sound)
         soundBox.setSelectedItemIndex (sound, juce::dontSendNotification);
+    keyboard.setSuggestions (rows[0].map->getSuggested(), rows[1].map->getSuggested(), suggestColour);
     keyboard.repaint();
     repaint (rows[1].area);
 }
@@ -1022,11 +1097,15 @@ void SoulKeysEditor::resized()
         voicingButtons[i]->setBounds (22 + i * 72, vy + 26, 70, 26);
     topNoteCaption.setBounds (322, vy + 8, 100, 14);
     topNoteBox.setBounds (322, vy + 26, 100, 26);
-    suggestCaption.setBounds (440, vy + 8, 140, 14);
+    suggestCaption.setBounds (440, vy + 8, 220, 14);
     suggestToggle.setBounds (440, vy + 28, 56, 24);
-    midiOutCaption.setBounds (590, vy + 8, 120, 14);
-    midiOutBox.setBounds (590, vy + 26, 150, 26);
-    midiHint.setBounds (752, vy + 14, W - 24 - 752, 40);
+    for (int i = 0; i < swatches.size(); ++i)
+        swatches[i]->setBounds (502 + i * 24, vy + 27, 24, 24);
+    customColour.setBounds (698, vy + 27, 58, 24);
+    midiOutCaption.setBounds (772, vy + 8, 120, 14);
+    midiOutBox.setBounds (772, vy + 26, 140, 26);
+    midiHint.setBounds (920, vy + 8, W - 24 - 920, 52);
+    midiHint.setFont (juce::FontOptions (10.5f));
 
     keyboard.setBounds (12, vy + vh + 8, W - 24, H - (vy + vh + 8) - 8);
     keyboard.setKeyWidth ((float) (W - 24) / 36.0f);
