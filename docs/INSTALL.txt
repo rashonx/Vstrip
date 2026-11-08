@@ -1,8 +1,8 @@
 Rashon Vocal Sitter - install on Windows
 ========================================
 
-1. Delete any older "Rashon Vocal Sitter ....vst3" folders from the folder below, then copy in the new
-   "Rashon Vocal Sitter vX.Y.Z.vst3" folder (the number is the version) to:
+1. Unzip the download and open the "Rashon Vocal Sitter vX.Y.Z" folder (the number is the version).
+   Copy the "Rashon Vocal Sitter.vst3" folder inside it to (replace the old one if Windows asks):
        C:\Program Files\Common Files\VST3\
 2. Open your DAW and rescan plugins.
 

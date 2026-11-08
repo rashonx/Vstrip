@@ -22,18 +22,26 @@ jobs:
         shell: bash
         run: echo "number=$(grep -oP 'project\(RashonVocalSitter VERSION \K[0-9.]+' CMakeLists.txt)" >> "$GITHUB_OUTPUT"
 
-      - name: Package (version number in the file names)
+      - name: Package (version number on the folder; plugin files keep their normal names)
         shell: pwsh
         run: |
           $v = "${{ steps.version.outputs.number }}"
           $name = "Rashon Vocal Sitter"
-          New-Item -ItemType Directory -Force dist | Out-Null
-          $bundle = "dist/$name v$v.vst3"
-          Copy-Item -Recurse "build/VocalSitter_artefacts/Release/VST3/$name.vst3" $bundle
-          # The plugin file inside the bundle must have the same name as the bundle
-          Get-ChildItem "$bundle/Contents" -Recurse -File -Filter "$name.vst3" | Rename-Item -NewName "$name v$v.vst3"
-          Copy-Item "build/VocalSitter_artefacts/Release/Standalone/$name.exe" "dist/$name v$v.exe"
-          Copy-Item docs/INSTALL.txt "dist/INSTALL v$v.txt"
+          $folder = "dist/$name v$v"
+          New-Item -ItemType Directory -Force $folder | Out-Null
+          Copy-Item -Recurse "build/VocalSitter_artefacts/Release/VST3/$name.vst3" "$folder/"
+          Copy-Item "build/VocalSitter_artefacts/Release/Standalone/$name.exe" "$folder/"
+          Copy-Item docs/INSTALL.txt "$folder/INSTALL.txt"
+
+      - name: Load test with pluginval
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/Tracktion/pluginval/releases/latest/download/pluginval_Windows.zip -OutFile pluginval.zip
+          Expand-Archive pluginval.zip -DestinationPath pluginval
+          $bundle = (Get-ChildItem dist -Recurse -Filter *.vst3 -Directory | Select-Object -First 1).FullName
+          ./pluginval/pluginval.exe --strictness-level 5 --validate-in-process --timeout-ms 120000 "$bundle"
+          exit $LASTEXITCODE
 
       - uses: actions/upload-artifact@v4
         with:
