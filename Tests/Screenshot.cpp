@@ -17,7 +17,10 @@ int main (int argc, char** argv)
     std::unique_ptr<juce::AudioProcessorEditor> editor (proc.createEditor());
     if (argc > 2)
         if (auto* e = dynamic_cast<SoulKeysEditor*> (editor.get()))
-            e->setSkin (juce::String (argv[2]).getIntValue());
+        {
+            e->getView().setSkin (juce::String (argv[2]).getIntValue());
+            if (argc > 3) e->setScale ((float) juce::String (argv[3]).getDoubleValue());
+        }
     editor->setVisible (true);
 
     std::thread audio ([&]

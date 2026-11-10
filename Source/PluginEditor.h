@@ -98,14 +98,20 @@ private:
     bool dragging = false;
 };
 
-class SoulKeysEditor : public juce::AudioProcessorEditor,
+// Everything you see, drawn at a fixed design size; SoulKeysEditor scales it to the window size.
+class SoulKeysView : public juce::Component,
                        public juce::FileDragAndDropTarget,
                        private juce::Timer,
                        private juce::ValueTree::Listener
 {
 public:
-    explicit SoulKeysEditor (SoulKeysProcessor&);
-    ~SoulKeysEditor() override;
+    explicit SoulKeysView (SoulKeysProcessor&);
+    ~SoulKeysView() override;
+
+    // Window size (scale) handling
+    std::function<void (float)> onScaleRequest;
+    float savedScale() const;
+    void rememberScale (float scale);
 
     void setSkin (int index);
     void paint (juce::Graphics&) override;
@@ -218,6 +224,25 @@ private:
     std::vector<std::tuple<juce::Rectangle<int>, juce::String, bool>> panels; // area, title, uses zone B colour
     std::unique_ptr<juce::FileChooser> chooser;
     int skinIndex = 0;
+
+    juce::ComboBox sizeBox;
+    juce::Label sizeCaption;
+    float currentScale = 1.0f;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SoulKeysView)
+};
+
+// The plugin window: holds the view and scales it to whatever size the window is dragged to.
+class SoulKeysEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit SoulKeysEditor (SoulKeysProcessor&);
+    void resized() override;
+    void setScale (float scale);
+    SoulKeysView& getView() { return view; }
+
+private:
+    SoulKeysView view;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SoulKeysEditor)
 };

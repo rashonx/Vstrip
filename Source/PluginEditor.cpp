@@ -296,8 +296,8 @@ void DragMidiButton::mouseDrag (const juce::MouseEvent& e)
 //==============================================================================
 // Editor
 
-SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
-    : AudioProcessorEditor (p), processor (p), keyboard (p.keyboardState, p)
+SoulKeysView::SoulKeysView (SoulKeysProcessor& p)
+    : processor (p), keyboard (p.keyboardState, p)
 {
     setLookAndFeel (&lnf);
 
@@ -315,6 +315,13 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
         l.setFont (juce::FontOptions (11.0f));
         addAndMakeVisible (l);
     };
+
+    caption (sizeCaption, "SIZE");
+    for (int pct : { 50, 60, 70, 75, 80, 90, 100, 110, 125, 150, 175, 200 })
+        sizeBox.addItem (juce::String (pct) + " %", pct);
+    sizeBox.setTooltip ("Window size. You can also drag the bottom-right corner.");
+    sizeBox.onChange = [this] { if (onScaleRequest && sizeBox.getSelectedId() > 0) onScaleRequest ((float) sizeBox.getSelectedId() / 100.0f); };
+    addAndMakeVisible (sizeBox);
 
     caption (skinCaption, "SKIN");
     for (size_t i = 0; i < KeysSkin::all().size(); ++i)
@@ -435,8 +442,8 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
         picker->setSize (300, 280);
         struct Listener : juce::ChangeListener
         {
-            SoulKeysEditor& editor;
-            explicit Listener (SoulKeysEditor& e) : editor (e) {}
+            SoulKeysView& editor;
+            explicit Listener (SoulKeysView& e) : editor (e) {}
             void changeListenerCallback (juce::ChangeBroadcaster* b) override
             {
                 if (auto* sel = dynamic_cast<juce::ColourSelector*> (b)) editor.setSuggestColour (sel->getCurrentColour().withAlpha (1.0f));
@@ -513,19 +520,20 @@ SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
     startTimerHz (20);
 }
 
-SoulKeysEditor::~SoulKeysEditor()
+SoulKeysView::~SoulKeysView()
 {
+    if (settings != nullptr) settings->saveIfNeeded();
     processor.apvts.state.removeListener (this);
     setLookAndFeel (nullptr);
 }
 
-void SoulKeysEditor::showStatus (const juce::String& text)
+void SoulKeysView::showStatus (const juce::String& text)
 {
     splitHint.setText (text, juce::dontSendNotification);
     statusUntil = juce::Time::getMillisecondCounterHiRes() + 7000.0;
 }
 
-void SoulKeysEditor::setParam (const juce::String& id, float value)
+void SoulKeysView::setParam (const juce::String& id, float value)
 {
     auto* p = processor.apvts.getParameter (id);
     p->beginChangeGesture();
@@ -533,7 +541,7 @@ void SoulKeysEditor::setParam (const juce::String& id, float value)
     p->endChangeGesture();
 }
 
-void SoulKeysEditor::buildZoneRow (int z)
+void SoulKeysView::buildZoneRow (int z)
 {
     auto& r = rows[(size_t) z];
     r.title.setFont (juce::FontOptions (13.0f, juce::Font::bold));
@@ -634,7 +642,7 @@ void SoulKeysEditor::buildZoneRow (int z)
     addAndMakeVisible (*r.map);
 }
 
-void SoulKeysEditor::askToSavePreset (int z)
+void SoulKeysView::askToSavePreset (int z)
 {
     auto current = processor.chordSetName (z, juce::roundToInt (processor.apvts.getRawParameterValue (SoulKeysProcessor::pid (z, "chordSet"))->load()));
     current = current.fromFirstOccurrenceOf ("From file: ", false, false).isNotEmpty() ? current.fromFirstOccurrenceOf ("From file: ", false, false)
@@ -645,7 +653,7 @@ void SoulKeysEditor::askToSavePreset (int z)
     w->addTextEditor ("name", current.trim() + " (mine)");
     w->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
     w->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
-    juce::Component::SafePointer<SoulKeysEditor> safe (this);
+    juce::Component::SafePointer<SoulKeysView> safe (this);
     w->enterModalState (true, juce::ModalCallbackFunction::create ([safe, w, z] (int result)
     {
         if (safe == nullptr || result != 1) return;
@@ -661,13 +669,13 @@ void SoulKeysEditor::askToSavePreset (int z)
 //==============================================================================
 // Recorder
 
-void SoulKeysEditor::finishTake()
+void SoulKeysView::finishTake()
 {
     processor.drainRecording (take);
     showStatus (take.empty() ? "Nothing was recorded." : "Take ready: " + takeSummary() + ". Drag DRAG MIDI onto a MIDI track, or SAVE MIDI.");
 }
 
-juce::String SoulKeysEditor::takeSummary() const
+juce::String SoulKeysView::takeSummary() const
 {
     int notes = 0;
     double first = 1.0e9, last = 0.0;
@@ -679,7 +687,7 @@ juce::String SoulKeysEditor::takeSummary() const
            + " at " + juce::String (juce::roundToInt (takeBpm)) + " BPM";
 }
 
-juce::File SoulKeysEditor::writeTake (const juce::File& file) const
+juce::File SoulKeysView::writeTake (const juce::File& file) const
 {
     if (take.empty()) return {};
     auto events = take;
@@ -712,7 +720,7 @@ juce::File SoulKeysEditor::writeTake (const juce::File& file) const
     return file;
 }
 
-juce::File SoulKeysEditor::takeFileForDrag()
+juce::File SoulKeysView::takeFileForDrag()
 {
     if (processor.isRecording()) { processor.stopRecording(); finishTake(); }
     if (take.empty()) { showStatus ("Record something first."); return {}; }
@@ -721,7 +729,7 @@ juce::File SoulKeysEditor::takeFileForDrag()
     return writeTake (lastDragFile);
 }
 
-void SoulKeysEditor::refreshSetList (int z, bool force)
+void SoulKeysView::refreshSetList (int z, bool force)
 {
     auto& r = rows[(size_t) z];
     const bool hasUser = processor.hasUserChords (z);
@@ -739,7 +747,7 @@ void SoulKeysEditor::refreshSetList (int z, bool force)
     r.listedUser = hasUser;
 }
 
-void SoulKeysEditor::bindSoundKnobs()
+void SoulKeysView::bindSoundKnobs()
 {
     for (auto* k : soundKnobs)
     {
@@ -754,7 +762,7 @@ void SoulKeysEditor::bindSoundKnobs()
     repaint();
 }
 
-void SoulKeysEditor::setSuggestColour (juce::Colour c)
+void SoulKeysView::setSuggestColour (juce::Colour c)
 {
     suggestColour = c;
     processor.apvts.state.setProperty ("suggestColour", c.toString(), nullptr);
@@ -770,7 +778,7 @@ void SoulKeysEditor::setSuggestColour (juce::Colour c)
     repaint();
 }
 
-void SoulKeysEditor::setSkin (int index)
+void SoulKeysView::setSkin (int index)
 {
     skinIndex = juce::jlimit (0, (int) KeysSkin::all().size() - 1, index);
     processor.apvts.state.setProperty ("skin", skinIndex, nullptr);
@@ -786,7 +794,7 @@ void SoulKeysEditor::setSkin (int index)
     repaint();
 }
 
-void SoulKeysEditor::applySkinColours()
+void SoulKeysView::applySkinColours()
 {
     const auto& s = lnf.skin();
     for (auto& r : rows)
@@ -798,7 +806,7 @@ void SoulKeysEditor::applySkinColours()
         r.octValue.setColour (juce::Label::textColourId, s.text);
     }
     keyboard.setSkin (s);
-    for (auto* l : { &skinCaption, &splitCaption, &splitAtCaption, &strumLabel, &bassLabel, &leadingLabel, &chordModeLabel, &recCaption, &takeInfo, &compareCaption, &voicingCaption, &topNoteCaption, &suggestCaption, &midiOutCaption, &midiHint })
+    for (auto* l : { &sizeCaption, &skinCaption, &splitCaption, &splitAtCaption, &strumLabel, &bassLabel, &leadingLabel, &chordModeLabel, &recCaption, &takeInfo, &compareCaption, &voicingCaption, &topNoteCaption, &suggestCaption, &midiOutCaption, &midiHint })
         l->setColour (juce::Label::textColourId, s.dim);
     splitHint.setColour (juce::Label::textColourId, s.dim);
     status.setColour (juce::Label::textColourId, s.dim);
@@ -816,7 +824,7 @@ void SoulKeysEditor::applySkinColours()
         b->setColour (juce::TextButton::textColourOnId, contrast (s.accent2));
 }
 
-bool SoulKeysEditor::isInterestedInFileDrag (const juce::StringArray& files)
+bool SoulKeysView::isInterestedInFileDrag (const juce::StringArray& files)
 {
     for (auto& f : files)
         if (! juce::File (f).hasFileExtension ("mid;midi;wav;aif;aiff;flac;mp3;ogg;soulkeys"))
@@ -824,7 +832,7 @@ bool SoulKeysEditor::isInterestedInFileDrag (const juce::StringArray& files)
     return ! files.isEmpty();
 }
 
-void SoulKeysEditor::filesDropped (const juce::StringArray& files, int, int y)
+void SoulKeysView::filesDropped (const juce::StringArray& files, int, int y)
 {
     if (files.isEmpty()) return;
     // Dropped on zone B's area (and split is on) -> zone B, otherwise zone A
@@ -842,10 +850,10 @@ void SoulKeysEditor::filesDropped (const juce::StringArray& files, int, int y)
     loadChordsFrom (juce::File (files[0]), zone);
 }
 
-void SoulKeysEditor::loadChordsFrom (const juce::File& file, int zone)
+void SoulKeysView::loadChordsFrom (const juce::File& file, int zone)
 {
     showStatus ("Listening to " + file.getFileName() + "...");
-    juce::Component::SafePointer<SoulKeysEditor> safe (this);
+    juce::Component::SafePointer<SoulKeysView> safe (this);
     juce::Thread::launch ([safe, file, zone]
     {
         auto result = ChordExtractor::fromFile (file);
@@ -866,7 +874,7 @@ void SoulKeysEditor::loadChordsFrom (const juce::File& file, int zone)
     });
 }
 
-void SoulKeysEditor::timerCallback()
+void SoulKeysView::timerCallback()
 {
     // Group changes into undo steps: a new step after half a second without edits
     if (editPending && juce::Time::getMillisecondCounterHiRes() - lastEdit > 500.0)
@@ -936,7 +944,7 @@ void SoulKeysEditor::timerCallback()
     repaint (rows[1].area);
 }
 
-void SoulKeysEditor::drawPanel (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& title, juce::Colour stripe)
+void SoulKeysView::drawPanel (juce::Graphics& g, juce::Rectangle<int> r, const juce::String& title, juce::Colour stripe)
 {
     const auto& s = lnf.skin();
     auto f = r.toFloat();
@@ -954,7 +962,7 @@ void SoulKeysEditor::drawPanel (juce::Graphics& g, juce::Rectangle<int> r, const
     }
 }
 
-void SoulKeysEditor::paint (juce::Graphics& g)
+void SoulKeysView::paint (juce::Graphics& g)
 {
     const auto& s = lnf.skin();
     g.setGradientFill (juce::ColourGradient (s.bgTop, 0.0f, 0.0f, s.bg, 0.0f, 200.0f, false));
@@ -979,7 +987,7 @@ void SoulKeysEditor::paint (juce::Graphics& g)
         drawPanel (g, r, t, zoneB ? s.accent2 : s.accent);
 }
 
-void SoulKeysEditor::paintOverChildren (juce::Graphics& g)
+void SoulKeysView::paintOverChildren (juce::Graphics& g)
 {
     if (processor.splitOn())
         return;
@@ -993,7 +1001,7 @@ void SoulKeysEditor::paintOverChildren (juce::Graphics& g)
     g.drawText ("Zone B is off.  Turn on SPLIT MODE above to play a second chord set on the high keys.", r, juce::Justification::centred);
 }
 
-void SoulKeysEditor::layoutZoneRow (int z, int y)
+void SoulKeysView::layoutZoneRow (int z, int y)
 {
     auto& r = rows[(size_t) z];
     r.area = { 12, y - 4, W - 24, 184 };
@@ -1021,9 +1029,11 @@ void SoulKeysEditor::layoutZoneRow (int z, int y)
     r.map->setBounds (18, y + 50, W - 36, 126);
 }
 
-void SoulKeysEditor::resized()
+void SoulKeysView::resized()
 {
     panels.clear();
+    sizeCaption.setBounds (W - 360, 14, 60, 14);
+    sizeBox.setBounds (W - 360, 30, 90, 26);
     skinCaption.setBounds (W - 260, 14, 60, 14);
     skinBox.setBounds (W - 260, 30, 242, 26);
 
@@ -1109,4 +1119,63 @@ void SoulKeysEditor::resized()
 
     keyboard.setBounds (12, vy + vh + 8, W - 24, H - (vy + vh + 8) - 8);
     keyboard.setKeyWidth ((float) (W - 24) / 36.0f);
+}
+
+//==============================================================================
+// Window size
+
+float SoulKeysView::savedScale() const
+{
+    const auto& state = processor.apvts.state;
+    if (state.hasProperty ("uiScale"))
+        return (float) state.getProperty ("uiScale");
+    if (settings != nullptr && settings->containsKey ("uiScale"))
+        return (float) settings->getDoubleValue ("uiScale", 1.0);
+    // First time: fit comfortably on the screen
+    float scale = 1.0f;
+    if (auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+    {
+        const auto area = display->userArea;
+        scale = juce::jmin (1.0f, (float) area.getHeight() * 0.85f / (float) H, (float) area.getWidth() * 0.9f / (float) W);
+    }
+    return juce::jlimit (0.5f, 1.0f, scale);
+}
+
+void SoulKeysView::rememberScale (float scale)
+{
+    currentScale = scale;
+    processor.apvts.state.setProperty ("uiScale", scale, nullptr);
+    if (settings != nullptr)
+        settings->setValue ("uiScale", (double) scale);
+    const int pct = juce::roundToInt (scale * 100.0f);
+    if (sizeBox.getSelectedId() != pct)
+        sizeBox.setText (juce::String (pct) + " %", juce::dontSendNotification);
+}
+
+SoulKeysEditor::SoulKeysEditor (SoulKeysProcessor& p)
+    : AudioProcessorEditor (p), view (p)
+{
+    addAndMakeVisible (view);
+    view.onScaleRequest = [this] (float s) { setScale (s); };
+    setResizable (true, true);
+    setResizeLimits (W / 2, H / 2, W * 2, H * 2);
+    if (auto* c = getConstrainer())
+        c->setFixedAspectRatio ((double) W / (double) H);
+    const float s = view.savedScale();
+    setSize (juce::roundToInt ((float) W * s), juce::roundToInt ((float) H * s));
+}
+
+void SoulKeysEditor::setScale (float scale)
+{
+    scale = juce::jlimit (0.5f, 2.0f, scale);
+    setSize (juce::roundToInt ((float) W * scale), juce::roundToInt ((float) H * scale));
+}
+
+void SoulKeysEditor::resized()
+{
+    // The whole window is drawn at its design size and scaled, so it stays sharp at any size
+    const float scale = (float) getWidth() / (float) W;
+    view.setBounds (0, 0, W, H);
+    view.setTransform (juce::AffineTransform::scale (scale));
+    view.rememberScale (scale);
 }

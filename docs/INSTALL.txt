@@ -94,3 +94,11 @@ UNDO / REDO and COMPARE
 - UNDO / REDO step back and forward through your changes.
 - COMPARE 1 / 2 holds two complete setups. Switch between them to compare; COPY copies the current
   setup into the other slot.
+
+New in v1.4.0
+-------------
+RESIZABLE WINDOW
+- Drag the bottom-right corner of the plugin to make it bigger or smaller, or pick a size
+  (50% - 200%) from the SIZE menu at the top. Everything scales and stays sharp.
+- Your size is remembered with the project and for new copies of the plugin. On small screens the
+  plugin opens at a size that fits the first time.
