@@ -5,6 +5,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -34,6 +37,7 @@ jobs:
           Copy-Item docs/INSTALL.txt "$folder/INSTALL.txt"
 
       - name: Load test with pluginval
+        id: loadtest
         continue-on-error: true
         shell: pwsh
         run: |
@@ -42,6 +46,25 @@ jobs:
           $bundle = (Get-ChildItem dist -Recurse -Filter *.vst3 -Directory | Select-Object -First 1).FullName
           ./pluginval/pluginval.exe --strictness-level 5 --validate-in-process --timeout-ms 120000 "$bundle"
           exit $LASTEXITCODE
+
+      - name: Publish to the Releases page
+        if: github.event_name == 'push' && steps.loadtest.outcome == 'success'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.version.outputs.number }}"
+          $name = "Rashon Vocal Sitter"
+          $tag = "vocal-sitter-v$v"
+          $zip = "$($name -replace ' ', '-')-v$v-Windows.zip"
+          Compress-Archive -Path "dist/$name v$v" -DestinationPath $zip -Force
+          $notes = "Download **$zip** below (under Assets), unzip it, and follow INSTALL / SETUP inside.`n`nCopy the **Rashon Vocal Sitter.vst3** folder into ``C:\\Program Files\\Common Files\\VST3\\`` (replace the old one), then rescan plugins in your DAW."
+          gh release view $tag --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $zip --clobber --repo "${{ github.repository }}"
+          } else {
+            gh release create $tag $zip --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "$name v$v" --notes $notes
+          }
 
       - uses: actions/upload-artifact@v4
         with:
