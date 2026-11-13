@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plugins - Dodge City Plugins</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rye&family=Oswald:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Saloon-at-night: dark wood, brass gold, one red accent for the download buttons */
+:root {
+  --bg: #120d09;
+  --panel: #1f1711;
+  --edge: #3a2b1d;
+  --text: #f1e6d0;
+  --dim: #a8957a;
+  --gold: #f2b84b;
+  --red: #c4161f;
+  --font-display: "Rye", Georgia, serif;
+  --font-body: "Oswald", "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); }
+body { background: radial-gradient(ellipse at 50% -10%, #2c1f14 0%, var(--bg) 60%) fixed; }
+header { text-align: center; padding: 36px 16px 8px; }
+header img { width: min(360px, 80vw); height: auto; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(48px, 9vw, 88px); margin: 8px 0 0; color: var(--gold);
+     text-shadow: 3px 3px 0 #5a3306, 6px 6px 0 #2a1608; letter-spacing: 2px; }
+.lede { color: var(--dim); max-width: 60ch; margin: 10px auto 0; font-size: 18px; line-height: 1.5; }
+main { max-width: 1140px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+.card .shot { aspect-ratio: 16 / 10; background: #0b0806; display: block; width: 100%; object-fit: cover; object-position: top; border-bottom: 1px solid var(--edge); }
+.card .placeholder { aspect-ratio: 16 / 10; display: grid; place-items: center; background: linear-gradient(135deg, #1b2230, #0d1119); border-bottom: 1px solid var(--edge);
+                     font-family: var(--font-display); color: var(--gold); font-size: 30px; text-align: center; padding: 16px; }
+.card .placeholder small { display: block; font-family: var(--font-body); color: var(--dim); font-size: 15px; margin-top: 8px; letter-spacing: 1px; }
+.body { padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.kind { font-size: 12px; letter-spacing: 3px; text-transform: uppercase; color: var(--gold); }
+h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 28px; text-wrap: balance; }
+.desc { margin: 0; color: var(--dim); line-height: 1.5; }
+.status { font-size: 14px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.download { margin-top: auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: var(--red); color: #fff; text-decoration: none;
+            font-weight: 600; font-size: 18px; letter-spacing: 1px; padding: 12px 16px; border-radius: 8px; border: 2px solid #ff4a52; }
+.download:hover { background: #e0242c; }
+.download:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.download[aria-disabled="true"] { background: #3a2b1d; border-color: var(--edge); color: var(--dim); pointer-events: none; }
+details { font-size: 14px; color: var(--dim); }
+details a { color: var(--gold); }
+details ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.7; }
+.install { max-width: 1140px; margin: 0 auto 40px; padding: 0 16px; }
+.install div { background: var(--panel); border: 1px solid var(--edge); border-radius: 12px; padding: 18px 22px; line-height: 1.6; color: var(--dim); }
+.install h3 { margin: 0 0 6px; color: var(--text); font-weight: 500; letter-spacing: 1px; }
+.install code { color: var(--text); background: #2a2018; padding: 1px 6px; border-radius: 4px; }
+footer { text-align: center; color: var(--dim); font-size: 13px; padding: 0 16px 32px; }
+footer a { color: var(--gold); }
+</style>
+</head>
+<body>
+<header>
+  <img src="img/logo.png" alt="Dodge City Plugins">
+  <h1>Plugins</h1>
+  <p class="lede">Every Dodge City plugin in one place. Each button downloads the newest version for Windows.</p>
+</header>
+
+<main id="plugins"></main>
+
+<section class="install">
+  <div>
+    <h3>Installing a plugin</h3>
+    Unzip the download and open the folder inside. Copy the <code>.vst3</code> folder into
+    <code>C:\Program Files\Common Files\VST3\</code> (replace the old one if Windows asks), then rescan plugins in your DAW.
+    Full steps are in the <code>INSTALL.txt</code> file in each download.
+  </div>
+</section>
+
+<footer>
+  Downloads come straight from the <a href="https://github.com/rashonx/Vstrip/releases">releases page</a>, so new versions show up here automatically.
+</footer>
+
+<script>
+// Plugins shown on the page, in order. "tag" matches the start of each release tag (e.g. soul-keys-v1.4.0).
+const PLUGINS = [
+  { tag: "soul-keys", name: "Rashon Soul Keys", kind: "Instrument (VST3)", img: "img/soul-keys.jpg",
+    desc: "Lush neo soul and R&B chords from one key. 50 chord sets plus 50 more in Preset Pack 2, split mode, Rhodes and tape piano sounds, chord pulling from MIDI and audio, MIDI recording and MIDI output." },
+  { tag: "vocal-sitter", name: "Rashon Vocal Sitter", kind: "Effect (VST3)", img: "img/vocal-sitter.jpg",
+    desc: "Sidechain track spacer: put it on your beat, feed it the vocal, and it carves room for the voice in 32 bands with no delay. 5 layouts and 6 skins." },
+  { tag: "x-vocal", name: "Rashon X Vocal", kind: "Effect (VST3)", img: "img/x-vocal.jpg",
+    desc: "All-in-one vocal channel strip: low cut, gate, EQ, de-esser, compressor, saturation, delay and reverb." },
+  { tag: "wheel-bridge", name: "Wheel Bridge", kind: "Windows app", img: null,
+    desc: "For Moza wheels: turns your wheel into an Xbox controller for games like Need for Speed Most Wanted and holds a constant centring force." },
+];
+const RELEASES = "https://github.com/rashonx/Vstrip/releases";
+
+function card(p, releases) {
+  const mine = releases.filter(r => r.tag_name.startsWith(p.tag + "-v") && !r.draft)
+                       .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  const latest = mine[0];
+  const zip = latest && latest.assets.find(a => a.name.endsWith(".zip"));
+  const el = document.createElement("article");
+  el.className = "card";
+  el.innerHTML = `
+    ${p.img ? `<img class="shot" src="${p.img}" alt="${p.name} window" loading="lazy">`
+            : `<div class="placeholder">${p.name}<small>MOZA WHEEL &rarr; XBOX CONTROLLER</small></div>`}
+    <div class="body">
+      <div class="kind">${p.kind}</div>
+      <h2>${p.name}</h2>
+      <p class="desc">${p.desc}</p>
+      <div class="status">${latest ? `Latest: v${latest.tag_name.split("-v").pop()} &middot; ${new Date(latest.published_at).toLocaleDateString()}${zip ? ` &middot; ${(zip.size / 1048576).toFixed(1)} MB` : ""}` : "Coming soon"}</div>
+      <a class="download" ${zip ? `href="${zip.browser_download_url}"` : `aria-disabled="true"`}>${zip ? `Download v${latest.tag_name.split("-v").pop()}` : "Not available yet"}</a>
+      ${mine.length > 1 ? `<details><summary>Older versions</summary><ul>${mine.slice(1).map(r => {
+          const a = r.assets.find(x => x.name.endsWith(".zip"));
+          return `<li>${a ? `<a href="${a.browser_download_url}">v${r.tag_name.split("-v").pop()}</a>` : `v${r.tag_name.split("-v").pop()}`}</li>`; }).join("")}</ul></details>` : ""}
+    </div>`;
+  return el;
+}
+
+async function load() {
+  const main = document.getElementById("plugins");
+  let releases = [];
+  try {
+    const res = await fetch("https://api.github.com/repos/rashonx/Vstrip/releases?per_page=100");
+    if (res.ok) releases = await res.json();
+  } catch (e) { /* offline or rate-limited: cards link to the releases page instead */ }
+  PLUGINS.forEach(p => main.appendChild(card(p, releases)));
+  if (! releases.length)
+    main.querySelectorAll(".download").forEach(a => { a.removeAttribute("aria-disabled"); a.href = RELEASES; a.textContent = "Go to downloads"; });
+}
+load();
+</script>
+</body>
+</html>
