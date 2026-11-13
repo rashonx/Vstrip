@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -29,6 +32,25 @@ jobs:
           Get-ChildItem dist -Filter *.pdb | Remove-Item
           Rename-Item dist/WheelBridge.exe "WheelBridge v$v.exe"
           Copy-Item SETUP.txt "dist/SETUP v$v.txt"
+
+      - name: Publish to the Releases page
+        if: github.event_name == 'push'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.version.outputs.number }}"
+          $name = "Wheel Bridge"
+          $tag = "wheel-bridge-v$v"
+          $zip = "$($name -replace ' ', '-')-v$v-Windows.zip"
+          Compress-Archive -Path "dist/*" -DestinationPath $zip -Force
+          $notes = "Download **$zip** below (under Assets), unzip it, and follow INSTALL / SETUP inside.`n`nInstall ViGEmBus and HidHide first (links in SETUP), then run the WheelBridge .exe."
+          gh release view $tag --repo "${{ github.repository }}" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $zip --clobber --repo "${{ github.repository }}"
+          } else {
+            gh release create $tag $zip --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "$name v$v" --notes $notes
+          }
 
       - uses: actions/upload-artifact@v4
         with:
