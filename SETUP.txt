@@ -34,7 +34,19 @@ TUNING
   NFS is arcade-style, so 270-400 degrees usually feels right.
 - "Anti-deadzone": if small wheel movements do nothing in the game, raise this.
 - "Damper": adds weight and smoothness.
-- "Game rumble to wheel": crashes and bumps from the game shake the wheel.
+- "Game rumble (buzz) to wheel": the game's controller rumble as a steady shake.
+
+FORCE FEEDBACK EFFECTS (panel 4, new in v1.1)
+Games like Need for Speed only send Xbox rumble, not real steering forces,
+so Wheel Bridge works these out from rumble, your pedals and your steering.
+Each one has its own on/off box and strength slider.
+- Crash & bump kicks: a hit jolts the wheel, then a smaller rebound.
+- Road texture: gravel, kerbs and grass come through as a fine fast buzz.
+- Speed weight: light when parked, heavier the longer you hold the throttle,
+  lighter again when you brake. (It's an estimate; the game doesn't report speed.)
+- Kickback: after a big turn, letting the wheel come back fast snaps it to centre.
+- Test kick: should push the wheel RIGHT. If it pushes LEFT, tick
+  "Flip kick direction" (Moza bases don't all agree on which way is which).
 
 USING THE WHEEL IN OTHER GAMES
 Click "Show wheel to games" (or uninstall HidHide) so other games can see the Moza directly.

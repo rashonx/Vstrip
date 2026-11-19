@@ -7,7 +7,7 @@ constant centring force on the wheel the whole time you play.
 - Reads the wheel, pedals and buttons with DirectInput
 - Creates a virtual Xbox 360 controller with [ViGEmBus](https://github.com/nefarius/ViGEmBus)
 - Hides the real wheel from games with [HidHide](https://github.com/nefarius/HidHide)
-- Drives the wheel's motor directly: centring spring, damper, and game rumble as wheel shake
+- Drives the wheel's motor directly: centring spring, damper, game rumble, plus v1.1 force feedback effects: crash kicks, road texture, speed weight and kickback
 
 See `SETUP.txt` for step-by-step setup. Builds come from GitHub Actions (Actions tab ->
 latest "Build Wheel Bridge" run -> WheelBridge-Windows artifact).

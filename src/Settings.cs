@@ -20,6 +20,17 @@ public class BridgeSettings
     public int DamperPct { get; set; } = 10;
     public int RumblePct { get; set; } = 30;
 
+    // Force feedback effects (v1.1)
+    public bool CrashOn { get; set; } = true;
+    public int CrashPct { get; set; } = 60;
+    public bool TextureOn { get; set; } = true;
+    public int TexturePct { get; set; } = 40;
+    public bool SpeedWeightOn { get; set; } = true;
+    public int SpeedWeightPct { get; set; } = 50;
+    public bool KickbackOn { get; set; } = true;
+    public int KickbackPct { get; set; } = 40;
+    public bool FlipForce { get; set; } = false;
+
     public Dictionary<string, int> Buttons { get; set; } = new();
 
     static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Dodge City Plugins", "Wheel Bridge");

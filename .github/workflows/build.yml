@@ -25,6 +25,28 @@ jobs:
       - name: Build single-file app
         run: dotnet publish src/WheelBridge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist
 
+      - name: Screenshot of the window
+        id: shot
+        continue-on-error: true
+        timeout-minutes: 3
+        shell: pwsh
+        run: |
+          $p = Start-Process dist/WheelBridge.exe -ArgumentList "--screenshot", "$PWD/screenshot.png" -PassThru
+          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw "screenshot timed out" }
+          if (-not (Test-Path screenshot.png)) { throw "no screenshot" }
+
+      - name: Save screenshot to the wheel-bridge-shots branch
+        if: steps.shot.outcome == 'success' && github.event_name == 'push'
+        continue-on-error: true
+        shell: bash
+        run: |
+          v="${{ steps.version.outputs.number }}"
+          mkdir shots && cp screenshot.png "shots/wheel-bridge-v$v.png" && cd shots
+          git init -q && git checkout -q -b wheel-bridge-shots
+          git config user.name "github-actions" && git config user.email "github-actions@users.noreply.github.com"
+          git add . && git commit -qm "Wheel Bridge v$v screenshot"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" wheel-bridge-shots
+
       - name: Package
         shell: pwsh
         run: |

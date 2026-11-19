@@ -5,7 +5,7 @@ namespace WheelBridge;
 
 public sealed class MainForm : Form
 {
-    const string Version = "1.0.0";
+    const string Version = "1.1.0";
     readonly BridgeSettings settings = BridgeSettings.Load();
     readonly Bridge bridge;
     readonly System.Windows.Forms.Timer uiTimer = new() { Interval = 33 };
@@ -40,7 +40,7 @@ public sealed class MainForm : Form
         BackColor = Theme.Back;
         ForeColor = Theme.Text;
         Font = new Font ("Segoe UI", 9.5f);
-        ClientSize = new Size (1000, 720);
+        ClientSize = new Size (1000, 880);
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
@@ -50,8 +50,9 @@ public sealed class MainForm : Form
         BuildLive();
         BuildSteeringCard();
         BuildPedalsAndButtonsCard();
+        BuildForceCard();
 
-        statusLine.SetBounds (16, 692, 968, 20);
+        statusLine.SetBounds (16, 852, 968, 20);
         statusLine.ForeColor = Theme.Dim;
         Controls.Add (statusLine);
 
@@ -106,7 +107,7 @@ public sealed class MainForm : Form
         title.SetBounds (256, 10, 400, 44);
         Controls.Add (title);
 
-        var sub = MakeLabel ($"MOZA WHEEL  →  XBOX CONTROLLER   ·   CONSTANT CENTRING   ·   v{Version}");
+        var sub = MakeLabel ($"MOZA WHEEL  →  XBOX CONTROLLER   ·   CONSTANT CENTRING   ·   FORCE FEEDBACK   ·   v{Version}");
         sub.ForeColor = Theme.Dim;
         sub.SetBounds (259, 54, 600, 20);
         Controls.Add (sub);
@@ -193,7 +194,51 @@ public sealed class MainForm : Form
         y += 28;
         SliderRow (card, ref y, "Centring strength", 0, 100, settings.CenteringPct, "%", v => settings.CenteringPct = v);
         SliderRow (card, ref y, "Damper (smooths the wheel)", 0, 100, settings.DamperPct, "%", v => settings.DamperPct = v);
-        SliderRow (card, ref y, "Game rumble to wheel", 0, 100, settings.RumblePct, "%", v => settings.RumblePct = v);
+        SliderRow (card, ref y, "Game rumble (buzz) to wheel", 0, 100, settings.RumblePct, "%", v => settings.RumblePct = v);
+    }
+
+    void BuildForceCard()
+    {
+        var card = Card (16, 694, 968, 150, "4. Force feedback effects");
+        var effects = new (string Name, string Help, bool On, int Pct, Action<bool> SetOn, Action<int> SetPct)[]
+        {
+            ("Crash & bump kicks", "Hits jolt the wheel in your hands", settings.CrashOn, settings.CrashPct, v => settings.CrashOn = v, v => settings.CrashPct = v),
+            ("Road texture", "Gravel, kerbs and grass buzz through", settings.TextureOn, settings.TexturePct, v => settings.TextureOn = v, v => settings.TexturePct = v),
+            ("Speed weight", "Light when parked, heavy at speed", settings.SpeedWeightOn, settings.SpeedWeightPct, v => settings.SpeedWeightOn = v, v => settings.SpeedWeightPct = v),
+            ("Kickback", "Snaps back to centre after big turns", settings.KickbackOn, settings.KickbackPct, v => settings.KickbackOn = v, v => settings.KickbackPct = v),
+        };
+        for (var i = 0; i < effects.Length; ++i)
+        {
+            var e = effects[i];
+            int x = 12 + i * 188, w = 176;
+            var box = new CheckBox { Text = e.Name, Checked = e.On, AutoSize = false, ForeColor = Theme.Text, BackColor = Theme.Card };
+            box.SetBounds (x, 34, w - 40, 22);
+            var value = MakeLabel ($"{e.Pct}%"); value.SetBounds (x + w - 44, 36, 44, 20); value.TextAlign = ContentAlignment.MiddleRight;
+            var bar = new TrackBar { Minimum = 0, Maximum = 100, Value = Math.Clamp (e.Pct, 0, 100), TickStyle = TickStyle.None, BackColor = Theme.Card, AutoSize = false, Enabled = e.On };
+            bar.SetBounds (x - 6, 58, w + 6, 28);
+            box.CheckedChanged += (_, _) => { e.SetOn (box.Checked); bar.Enabled = box.Checked; };
+            bar.ValueChanged += (_, _) => { value.Text = $"{bar.Value}%"; e.SetPct (bar.Value); };
+            var help = MakeLabel (e.Help); help.SetBounds (x, 86, w, 18); help.ForeColor = Theme.Dim; help.Font = new Font ("Segoe UI", 8.5f);
+            card.Controls.AddRange (new Control[] { box, value, bar, help });
+        }
+
+        var flip = new CheckBox { Text = "Flip kick direction", Checked = settings.FlipForce, AutoSize = true, ForeColor = Theme.Text, BackColor = Theme.Card };
+        flip.Location = new Point (12, 116);
+        flip.CheckedChanged += (_, _) => settings.FlipForce = flip.Checked;
+        var test = MakeButton ("Test kick (should push right)");
+        test.SetBounds (200, 113, 210, 26);
+        test.Click += (_, _) =>
+        {
+            bridge.Ffb.TestKick();
+            Status ("Kicked. If the wheel pushed LEFT, tick 'Flip kick direction'. Crash kicks and kickback use the same direction.");
+        };
+        var note = MakeLabel ("The game only sends Xbox rumble, so these are worked out from rumble, pedals and steering.");
+        note.SetBounds (420, 118, 340, 20); note.ForeColor = Theme.Dim; note.Font = new Font ("Segoe UI", 8f);
+        card.Controls.AddRange (new Control[] { flip, test, note });
+
+        var meter = new FfbMeter { Bridge = bridge };
+        meter.SetBounds (772, 30, 186, 112);
+        card.Controls.Add (meter);
     }
 
     void BuildPedalsAndButtonsCard()
@@ -371,6 +416,9 @@ public sealed class MainForm : Form
     void Tick()
     {
         live.Invalidate();
+        foreach (Control c in Controls)
+            foreach (Control m in c.Controls)
+                if (m is FfbMeter) m.Invalidate();
 
         // Learning a button mapping: the first newly pressed wheel button wins
         if (learnTarget != null)

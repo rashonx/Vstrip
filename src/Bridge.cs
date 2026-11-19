@@ -18,6 +18,8 @@ public sealed class Bridge : IDisposable
 
     // Live values for the window
     public volatile float SteeringDeg, StickOut, Throttle, Brake, Clutch, RumbleOut;
+    public volatile float SpeedFeel, KickOut, TextureOut;
+    public readonly FfbEngine Ffb = new();
     public readonly bool[] ButtonsDown = new bool[128];
     public readonly int[] AxisRaw = new int[Wheel.AxisNames.Length];
     public volatile string ForceError = "";
@@ -79,7 +81,8 @@ public sealed class Bridge : IDisposable
         timeBeginPeriod (1);
         var clock = Stopwatch.StartNew();
         long lastForce = -1000;
-        (bool, float, float, float) lastForces = (false, -1, -1, -1);
+        FfbOutput lastForces = new() { Spring = -1 };
+        var lastFlip = false;
         try
         {
             while (looping)
@@ -126,16 +129,27 @@ public sealed class Bridge : IDisposable
                     Pad.Send ((short) Math.Round (StickOut * 32767f), (byte) Math.Round (Throttle * 255f), (byte) Math.Round (Brake * 255f), mapped);
                 }
 
-                // Motor forces, refreshed about 50 times a second when something changed
-                if (clock.ElapsedMilliseconds - lastForce >= 20)
+                // Motor forces, refreshed 100 times a second (only sent when something changed)
+                var ms = clock.ElapsedMilliseconds;
+                if (ms - lastForce >= 10)
                 {
-                    lastForce = clock.ElapsedMilliseconds;
-                    RumbleOut = bridging ? cfg.RumblePct / 100f * Math.Max (Pad.LargeMotor, Pad.SmallMotor) : 0f;
-                    var now = (cfg.CenteringOn, cfg.CenteringPct / 100f, cfg.DamperPct / 100f, RumbleOut);
-                    if (now != lastForces)
+                    var input = new FfbInput
                     {
-                        ForceError = Wheel.UpdateForces (now.Item1, now.Item2, now.Item3, now.Item4);
-                        lastForces = now;
+                        Stick = stick, Throttle = Throttle, Brake = Brake, Dt = (ms - lastForce) / 1000f,
+                        LargeMotor = bridging ? Pad.LargeMotor : 0f, SmallMotor = bridging ? Pad.SmallMotor : 0f,
+                    };
+                    lastForce = ms;
+                    var f = Ffb.Step (cfg, input);
+                    SpeedFeel = f.Speed;
+                    RumbleOut = f.Rumble / 10000f;
+                    TextureOut = f.Texture / 10000f;
+                    KickOut = f.Constant / 10000f;
+                    if ((f.Spring, f.Damper, f.Rumble, f.Texture, f.Constant) != (lastForces.Spring, lastForces.Damper, lastForces.Rumble, lastForces.Texture, lastForces.Constant)
+                        || cfg.FlipForce != lastFlip)
+                    {
+                        ForceError = Wheel.UpdateForces (f, cfg.FlipForce);
+                        lastForces = f;
+                        lastFlip = cfg.FlipForce;
                     }
                 }
 

@@ -2,7 +2,7 @@ using System.Drawing.Drawing2D;
 
 namespace WheelBridge;
 
-// Picture of what the bridge is doing right now: wheel angle, stick output, pedals, rumble.
+// Picture of what the bridge is doing right now: wheel angle, stick output, pedals.
 public sealed class LiveView : Panel
 {
     public Bridge? Bridge;
@@ -74,10 +74,49 @@ public sealed class LiveView : Panel
         Pedal ("Throttle", b?.Throttle ?? 0, Theme.Green);
         Pedal ("Brake", b?.Brake ?? 0, Theme.Red);
         Pedal ("Clutch", b?.Clutch ?? 0, Theme.Blue);
-        Pedal ("Game rumble to wheel", b?.RumbleOut ?? 0, Theme.Gold);
 
         // Buttons currently held
         var held = b == null ? "" : string.Join (", ", Enumerable.Range (0, b.ButtonsDown.Length).Where (i => b.ButtonsDown[i]).Select (i => $"{i + 1}"));
         TextRenderer.DrawText (g, "Wheel buttons held: " + (held.Length == 0 ? "none" : held), smallFont, new Point (14, y + 4), Theme.Dim);
+    }
+}
+
+// Small live readout of the force feedback effects
+public sealed class FfbMeter : Panel
+{
+    public Bridge? Bridge;
+
+    public FfbMeter()
+    {
+        DoubleBuffered = true;
+        BackColor = Theme.Card;
+    }
+
+    protected override void OnPaint (PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        var b = Bridge;
+        using var font = new Font ("Segoe UI", 8f);
+        int y = 0;
+        void Row (string name, float v, Color c, bool centred)
+        {
+            TextRenderer.DrawText (g, name, font, new Point (0, y), Theme.Dim);
+            var r = new RectangleF (0, y + 15, Width - 2, 8);
+            using (var track = new SolidBrush (Theme.Track)) g.FillRectangle (track, r);
+            using var fill = new SolidBrush (c);
+            if (centred)
+            {
+                var half = r.Width / 2f * Math.Clamp (v, -1f, 1f);
+                g.FillRectangle (fill, half >= 0 ? r.X + r.Width / 2f : r.X + r.Width / 2f + half, r.Y, Math.Abs (half), r.Height);
+                using var mid = new Pen (Color.White); g.DrawLine (mid, r.X + r.Width / 2f, r.Y - 2, r.X + r.Width / 2f, r.Bottom + 2);
+            }
+            else
+                g.FillRectangle (fill, r.X, r.Y, r.Width * Math.Clamp (v, 0f, 1f), r.Height);
+            y += 28;
+        }
+        Row ("Speed feel (estimate)", b?.SpeedFeel ?? 0, Theme.Blue, false);
+        Row ("Kick  ←  →", b?.KickOut ?? 0, Theme.Red, true);
+        Row ("Road texture", b?.TextureOut ?? 0, Theme.Green, false);
+        Row ("Game rumble", b?.RumbleOut ?? 0, Theme.Gold, false);
     }
 }

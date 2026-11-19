@@ -2,14 +2,14 @@ using SharpDX.DirectInput;
 
 namespace WheelBridge;
 
-// The real Moza wheel: reads its axes and buttons and drives its motor (centring spring, damper, rumble).
+// The real Moza wheel: reads its axes and buttons and drives its motor (centring spring, damper, rumble, road texture and kicks).
 public sealed class Wheel : IDisposable
 {
     public static readonly string[] AxisNames = { "None", "X", "Y", "Z", "RotationX", "RotationY", "RotationZ", "Slider1", "Slider2" };
 
     readonly DirectInput directInput = new();
     Joystick? joystick;
-    Effect? spring, damper, rumble;
+    Effect? spring, damper, rumble, texture, constant;
     int[] actuatorAxes = Array.Empty<int>();
     readonly object gate = new();
 
@@ -108,47 +108,41 @@ public sealed class Wheel : IDisposable
         }
     };
 
-    // strength values are 0..1
-    public string UpdateForces (bool centeringOn, float centering, float damping, float rumbleLevel)
+    // Starts an effect the first time, then just updates its strength. Returns an error message or "".
+    string Drive (ref Effect? effect, Guid kind, TypeSpecificParameters p)
+    {
+        try
+        {
+            if (effect == null)
+            {
+                effect = new Effect (joystick!, kind, BaseParameters (p));
+                effect.Start (1);
+            }
+            else
+                effect.SetParameters (BaseParameters (p), EffectParameterFlags.TypeSpecificParameters);
+            return "";
+        }
+        catch (Exception e)
+        {
+            return e.Message;
+        }
+    }
+
+    // Strengths are DirectInput units 0..10000; constant is -10000..10000 (positive = push right unless flipped)
+    public string UpdateForces (in FfbOutput f, bool flipDirection)
     {
         lock (gate)
         {
             if (joystick == null || !HasForceFeedback) return "This wheel did not report force feedback";
-            try
-            {
-                var springStrength = centeringOn ? (int) (Math.Clamp (centering, 0f, 1f) * 10000) : 0;
-                var damperStrength = centeringOn ? (int) (Math.Clamp (damping, 0f, 1f) * 10000) : 0;
-
-                if (spring == null)
-                {
-                    spring = new Effect (joystick, EffectGuid.Spring, BaseParameters (Condition (springStrength, 10000)));
-                    spring.Start (1);
-                }
-                else
-                    spring.SetParameters (BaseParameters (Condition (springStrength, 10000)), EffectParameterFlags.TypeSpecificParameters);
-
-                if (damper == null)
-                {
-                    damper = new Effect (joystick, EffectGuid.Damper, BaseParameters (Condition (damperStrength, 10000)));
-                    damper.Start (1);
-                }
-                else
-                    damper.SetParameters (BaseParameters (Condition (damperStrength, 10000)), EffectParameterFlags.TypeSpecificParameters);
-
-                var shake = new PeriodicForce { Magnitude = (int) (Math.Clamp (rumbleLevel, 0f, 1f) * 10000), Offset = 0, Phase = 0, Period = 45000 };
-                if (rumble == null)
-                {
-                    rumble = new Effect (joystick, EffectGuid.Sine, BaseParameters (shake));
-                    rumble.Start (1);
-                }
-                else
-                    rumble.SetParameters (BaseParameters (shake), EffectParameterFlags.TypeSpecificParameters);
-                return "";
-            }
-            catch (Exception e)
-            {
-                return e.Message;
-            }
+            // The spring and damper matter most: report their errors first
+            var error = Drive (ref spring, EffectGuid.Spring, Condition (f.Spring, 10000));
+            var e2 = Drive (ref damper, EffectGuid.Damper, Condition (f.Damper, 10000));
+            // Others are extras: a wheel that refuses one still gets the rest
+            Drive (ref rumble, EffectGuid.Sine, new PeriodicForce { Magnitude = f.Rumble, Period = 45000 });
+            Drive (ref texture, EffectGuid.Sine, new PeriodicForce { Magnitude = f.Texture, Period = 16000 });
+            var push = flipDirection ? -f.Constant : f.Constant;
+            Drive (ref constant, EffectGuid.ConstantForce, new ConstantForce { Magnitude = push });
+            return error.Length > 0 ? error : e2;
         }
     }
 
@@ -156,11 +150,11 @@ public sealed class Wheel : IDisposable
     {
         lock (gate)
         {
-            foreach (var e in new[] { spring, damper, rumble })
+            foreach (var e in new[] { spring, damper, rumble, texture, constant })
             {
                 try { e?.Stop(); e?.Dispose(); } catch { }
             }
-            spring = damper = rumble = null;
+            spring = damper = rumble = texture = constant = null;
         }
     }
 
