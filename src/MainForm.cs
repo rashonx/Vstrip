@@ -42,6 +42,7 @@ public sealed class MainForm : Form
         Font = new Font ("Segoe UI", 9.5f);
         ClientSize = new Size (1000, 880);
         FormBorderStyle = FormBorderStyle.FixedSingle;
+        AutoScroll = true; // small screens: scroll instead of cutting off the bottom
         MaximizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
 
@@ -72,7 +73,7 @@ public sealed class MainForm : Form
 
     static Label MakeLabel (string text, bool bold = false) => new()
     {
-        Text = text, AutoSize = false, ForeColor = Theme.Text, BackColor = Color.Transparent,
+        Text = text, AutoSize = false, UseMnemonic = false, ForeColor = Theme.Text, BackColor = Color.Transparent,
         Font = new Font ("Segoe UI", bold ? 10f : 9.5f, bold ? FontStyle.Bold : FontStyle.Regular),
     };
 
@@ -161,7 +162,7 @@ public sealed class MainForm : Form
     // A labelled slider row: "Name ........ value" with a track bar underneath
     void SliderRow (Panel card, ref int y, string name, int min, int max, int value, string unit, Action<int> onChange)
     {
-        var label = MakeLabel (name); label.SetBounds (12, y, 200, 20); label.ForeColor = Theme.Dim; card.Controls.Add (label);
+        var label = MakeLabel (name); label.SetBounds (12, y, card.Width - 104, 20); label.ForeColor = Theme.Dim; card.Controls.Add (label);
         var valueLabel = MakeLabel ($"{value}{unit}"); valueLabel.SetBounds (card.Width - 90, y, 78, 20); valueLabel.TextAlign = ContentAlignment.MiddleRight; card.Controls.Add (valueLabel);
         var bar = new TrackBar { Minimum = min, Maximum = max, Value = Math.Clamp (value, min, max), TickStyle = TickStyle.None, BackColor = Theme.Card, AutoSize = false };
         bar.SetBounds (6, y + 20, card.Width - 12, 28);
@@ -174,7 +175,7 @@ public sealed class MainForm : Form
     {
         var card = Card (328, 234, 320, 450, "2. Steering & force");
         int y = 38;
-        var rl = MakeLabel ("Wheel rotation set in Moza Pit House"); rl.SetBounds (12, y, 220, 20); rl.ForeColor = Theme.Dim; card.Controls.Add (rl);
+        var rl = MakeLabel ("Wheel rotation (from Pit House)"); rl.SetBounds (12, y, 220, 20); rl.ForeColor = Theme.Dim; card.Controls.Add (rl);
         rotationBox.SetBounds (236, y - 2, 72, 24);
         rotationBox.BackColor = Theme.Track; rotationBox.ForeColor = Theme.Text;
         rotationBox.Value = Math.Clamp (settings.WheelRotation, 90, 2700);
@@ -182,7 +183,7 @@ public sealed class MainForm : Form
         card.Controls.Add (rotationBox);
         y += 32;
 
-        SliderRow (card, ref y, "Full lock in game at (wheel degrees)", 90, 1080, settings.SteeringLock, "°", v => settings.SteeringLock = v);
+        SliderRow (card, ref y, "Full lock in game at (wheel °)", 90, 1080, settings.SteeringLock, "°", v => settings.SteeringLock = v);
         SliderRow (card, ref y, "Centre deadzone", 0, 30, settings.DeadzonePct, "%", v => settings.DeadzonePct = v);
         SliderRow (card, ref y, "Anti-deadzone (beat the game's)", 0, 40, settings.AntiDeadzonePct, "%", v => settings.AntiDeadzonePct = v);
 
@@ -211,7 +212,7 @@ public sealed class MainForm : Form
         {
             var e = effects[i];
             int x = 12 + i * 188, w = 176;
-            var box = new CheckBox { Text = e.Name, Checked = e.On, AutoSize = false, ForeColor = Theme.Text, BackColor = Theme.Card };
+            var box = new CheckBox { UseMnemonic = false, Text = e.Name, Checked = e.On, AutoSize = false, ForeColor = Theme.Text, BackColor = Theme.Card };
             box.SetBounds (x, 34, w - 40, 22);
             var value = MakeLabel ($"{e.Pct}%"); value.SetBounds (x + w - 44, 36, 44, 20); value.TextAlign = ContentAlignment.MiddleRight;
             var bar = new TrackBar { Minimum = 0, Maximum = 100, Value = Math.Clamp (e.Pct, 0, 100), TickStyle = TickStyle.None, BackColor = Theme.Card, AutoSize = false, Enabled = e.On };
