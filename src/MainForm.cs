@@ -203,10 +203,10 @@ public sealed class MainForm : Form
         var card = Card (16, 694, 968, 150, "4. Force feedback effects");
         var effects = new (string Name, string Help, bool On, int Pct, Action<bool> SetOn, Action<int> SetPct)[]
         {
-            ("Crash & bump kicks", "Hits jolt the wheel in your hands", settings.CrashOn, settings.CrashPct, v => settings.CrashOn = v, v => settings.CrashPct = v),
-            ("Road texture", "Gravel, kerbs and grass buzz through", settings.TextureOn, settings.TexturePct, v => settings.TextureOn = v, v => settings.TexturePct = v),
-            ("Speed weight", "Light when parked, heavy at speed", settings.SpeedWeightOn, settings.SpeedWeightPct, v => settings.SpeedWeightOn = v, v => settings.SpeedWeightPct = v),
-            ("Kickback", "Snaps back to centre after big turns", settings.KickbackOn, settings.KickbackPct, v => settings.KickbackOn = v, v => settings.KickbackPct = v),
+            ("Crash kicks", "Hits jolt the wheel", settings.CrashOn, settings.CrashPct, v => settings.CrashOn = v, v => settings.CrashPct = v),
+            ("Road texture", "Gravel and kerbs buzz", settings.TextureOn, settings.TexturePct, v => settings.TextureOn = v, v => settings.TexturePct = v),
+            ("Speed weight", "Heavier as you go faster", settings.SpeedWeightOn, settings.SpeedWeightPct, v => settings.SpeedWeightOn = v, v => settings.SpeedWeightPct = v),
+            ("Kickback", "Snaps back after big turns", settings.KickbackOn, settings.KickbackPct, v => settings.KickbackOn = v, v => settings.KickbackPct = v),
         };
         for (var i = 0; i < effects.Length; ++i)
         {
@@ -233,7 +233,7 @@ public sealed class MainForm : Form
             bridge.Ffb.TestKick();
             Status ("Kicked. If the wheel pushed LEFT, tick 'Flip kick direction'. Crash kicks and kickback use the same direction.");
         };
-        var note = MakeLabel ("The game only sends Xbox rumble, so these are worked out from rumble, pedals and steering.");
+        var note = MakeLabel ("Worked out from game rumble, pedals and steering.");
         note.SetBounds (420, 118, 340, 20); note.ForeColor = Theme.Dim; note.Font = new Font ("Segoe UI", 8f);
         card.Controls.AddRange (new Control[] { flip, test, note });
 
@@ -273,7 +273,7 @@ public sealed class MainForm : Form
         card.Controls.Add (recal);
         y += 38;
 
-        var bl = MakeLabel ("Xbox button  ←  wheel button (click Set, then press)"); bl.SetBounds (12, y, 300, 20); bl.ForeColor = Theme.Dim; card.Controls.Add (bl);
+        var bl = MakeLabel ("Xbox button  ←  wheel button (Set, then press)"); bl.SetBounds (12, y, 300, 20); bl.ForeColor = Theme.Dim; card.Controls.Add (bl);
         y += 22;
         var list = new Panel { AutoScroll = true, BackColor = Theme.Card };
         list.SetBounds (6, y, card.Width - 12, card.Height - y - 8);
