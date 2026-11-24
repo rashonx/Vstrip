@@ -186,6 +186,14 @@ ChordSet SoulKeysProcessor::zoneChordsAsSet (int zone) const
             c.name = Voicing::name (c.root, c.quality);
         }
         set.chords[(size_t) pc] = c;
+
+        auto passing = pickChord (zone, pc, true, true);
+        if (passing.root >= 0 && passing.quality >= 0)
+        {
+            passing.notes = Voicing::make (passing.root, passing.quality, true, 62, nullptr);
+            passing.name = Voicing::name (passing.root, passing.quality);
+        }
+        set.passing[(size_t) pc] = passing;
     }
     set.tonic = set.chords[0].root;
     return set;
@@ -294,19 +302,19 @@ void SoulKeysProcessor::swapZones()
 //==============================================================================
 // Turning one key into a chord
 
-Chord SoulKeysProcessor::pickChord (int zoneIndex, int pc, bool forDisplay) const
+Chord SoulKeysProcessor::pickChord (int zoneIndex, int pc, bool forDisplay, bool passing) const
 {
     const auto& zone = zones[(size_t) zoneIndex];
     const int index = juce::roundToInt (param (zone.p.chordSet));
     const int keyChoice = juce::roundToInt (param (zone.p.key));
-    Chord c;
+    Chord c, hand; // hand: a hand-picked passing chord from the preset, if it has one
     int tonic = -1;
 
     if (index == scaleSlot)
     {
-        if (forDisplay)
-            return getChordSet (zoneIndex, index).chords[(size_t) pc]; // built in the key already
-        return zone.scaleSet.chords[(size_t) pc];
+        // Built in the key already
+        const auto main = forDisplay ? getChordSet (zoneIndex, index).chords[(size_t) pc] : zone.scaleSet.chords[(size_t) pc];
+        return passing ? Passing::make (main) : main;
     }
     if (index >= libraryStart)
     {
@@ -315,6 +323,7 @@ Chord SoulKeysProcessor::pickChord (int zoneIndex, int pc, bool forDisplay) cons
         if (sl.isLocked() && i < library.size())
         {
             c = library[i].chords[(size_t) pc];
+            hand = library[i].passing[(size_t) pc];
             tonic = library[i].tonic;
         }
     }
@@ -324,6 +333,7 @@ Chord SoulKeysProcessor::pickChord (int zoneIndex, int pc, bool forDisplay) cons
         if (sl.isLocked() && ! zone.user.chords[0].isEmpty())
         {
             c = zone.user.chords[(size_t) pc];
+            hand = zone.user.passing[(size_t) pc];
             tonic = zone.user.tonic;
         }
     }
@@ -331,8 +341,11 @@ Chord SoulKeysProcessor::pickChord (int zoneIndex, int pc, bool forDisplay) cons
     {
         const auto& set = presetSets()[(size_t) juce::jlimit (0, ChordPresets::count() - 1, index >= fileSlot ? 0 : index)];
         c = set.chords[(size_t) pc];
+        hand = set.passing[(size_t) pc];
         tonic = set.tonic;
     }
+    if (passing)
+        c = hand.isEmpty() ? Passing::make (c) : hand;
 
     // Move to the chosen key
     if (keyChoice > 0 && tonic >= 0)
@@ -345,19 +358,35 @@ Chord SoulKeysProcessor::pickChord (int zoneIndex, int pc, bool forDisplay) cons
     return c;
 }
 
+int SoulKeysProcessor::mainOctaveStart (int zone) const
+{
+    if (! splitOn()) return 48; // C3
+    const int firstC = (splitPoint() + 11) / 12 * 12;
+    return zone == 1 ? firstC : firstC - 24;
+}
+
+bool SoulKeysProcessor::isPassingKey (int key) const
+{
+    const int octave = (int) std::floor ((key - mainOctaveStart (zoneOf (key))) / 12.0);
+    return ((octave % 2) + 2) % 2 == 1;
+}
+
 Chord SoulKeysProcessor::resolveChord (int key, int zoneIndex, std::vector<int>* previousUpper, bool forDisplay) const
 {
+    return resolveSlot (key % 12, isPassingKey (key), zoneIndex, previousUpper, forDisplay);
+}
+
+Chord SoulKeysProcessor::resolveSlot (int pc, bool passing, int zoneIndex, std::vector<int>* previousUpper, bool forDisplay) const
+{
     const auto& zp = zones[(size_t) zoneIndex].p;
-    const int pc = key % 12;
-    const bool split = splitOn();
     const int octave = juce::roundToInt (param (zp.octave));
-    // In split mode both zones play in the same comfortable register; otherwise the key's octave sets it
-    const int shift = (split ? 0 : (key / 12 - 5) * 12) + octave * 12;
+    // Main and passing octaves play in the same comfortable register; the Octave control moves it
+    const int shift = octave * 12;
     const int ext = juce::roundToInt (param (zp.extensions));
     const bool bass = param ("bass") > 0.5f;
     const bool leading = param ("voiceLeading") > 0.5f;
 
-    Chord c = pickChord (zoneIndex, pc, forDisplay);
+    Chord c = pickChord (zoneIndex, pc, forDisplay, passing);
     Chord out;
     if (c.root >= 0 && c.quality >= 0)
     {
@@ -397,9 +426,9 @@ Chord SoulKeysProcessor::resolveChord (int key, int zoneIndex, std::vector<int>*
     return out;
 }
 
-Chord SoulKeysProcessor::chordForKey (int pitchClass, int zone) const
+Chord SoulKeysProcessor::chordForKey (int pitchClass, int zone, bool passing) const
 {
-    return resolveChord (60 + pitchClass, zone, nullptr, true);
+    return resolveSlot (((pitchClass % 12) + 12) % 12, passing, zone, nullptr, true);
 }
 
 void SoulKeysProcessor::handleKeyOn (int key, float velocity, int samplePos)
@@ -423,8 +452,10 @@ void SoulKeysProcessor::handleKeyOn (int key, float velocity, int samplePos)
         const float v = juce::jlimit (0.05f, 1.0f, velocity * (1.0f + human * 0.3f * (rng.nextFloat() - 0.5f)));
         pending.push_back ({ blockStart + samplePos + (double) i * strum + jitter, notes[i], v, key, zone });
     }
-    lastKeyPc[zone] = key % 12;
-    keyHeld[zone][key % 12] = true;
+    const int slot = key % 12 + (isPassingKey (key) ? 12 : 0);
+    keySlot[(size_t) key] = slot;
+    lastKeyPc[zone] = slot;
+    keyHeld[zone][slot] = true;
 }
 
 void SoulKeysProcessor::handleKeyOff (int key, int samplePos)
@@ -436,7 +467,9 @@ void SoulKeysProcessor::handleKeyOff (int key, int samplePos)
         if (z.refs[(size_t) n] > 0 && --z.refs[(size_t) n] == 0)
             z.midi.addEvent (juce::MidiMessage::noteOff (1, n), samplePos);
     notesFromKey[(size_t) key].clear();
-    keyHeld[zone][key % 12] = false;
+    if (keySlot[(size_t) key] >= 0)
+        keyHeld[zone][keySlot[(size_t) key]] = false;
+    keySlot[(size_t) key] = -1;
 }
 
 void SoulKeysProcessor::emitDue (int numSamples)

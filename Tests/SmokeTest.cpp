@@ -286,7 +286,7 @@ int main()
         k.drainRecording (take);
         int ons = 0, offs = 0;
         for (auto& e : take) (e.on ? ons : offs)++;
-        const int expected = (int) (k.chordForKey (0, 0).notes.size() + k.chordForKey (2, 0).notes.size());
+        const int expected = (int) (k.chordForKey (0, 0, true).notes.size() + k.chordForKey (2, 0, true).notes.size()); // C4 and D4: passing octave
         check (ons == expected && offs == expected, "recorder captures every chord note", juce::String (ons) + " on / " + juce::String (offs) + " off");
     }
 
@@ -339,7 +339,7 @@ int main()
             const auto m = meta.getMessage();
             if (m.isNoteOn()) (m.getChannel() == 1 ? ch1 : ch2)++;
         }
-        const int expectA = (int) k.chordForKey (2, 0).notes.size(), expectB = (int) k.chordForKey (0, 1).notes.size();
+        const int expectA = (int) k.chordForKey (2, 0, true).notes.size(), expectB = (int) k.chordForKey (0, 1, true).notes.size(); // D3 / C5: passing octaves
         check (ch1 == expectA && ch2 == expectB && buf.getMagnitude (0, 512) < 1.0e-6f, "MIDI only: chords go out as MIDI, zone A ch 1, zone B ch 2, no sound",
                juce::String (ch1) + "+" + juce::String (ch2) + " notes");
         set (k, "midiOut", 0.0f);
@@ -347,6 +347,50 @@ int main()
         midi2.addEvent (juce::MidiMessage::noteOn (1, 52, 0.8f), 0);
         k.processBlock (buf, midi2);
         check (midi2.isEmpty(), "MIDI output off sends nothing");
+    }
+
+    // 14a. Two-octave layout: chords on the main octave, passing chords on the next
+    {
+        SoulKeysProcessor k;
+        check (! k.isPassingKey (48) && ! k.isPassingKey (59) && k.isPassingKey (60) && k.isPassingKey (71) && ! k.isPassingKey (72) && k.isPassingKey (36),
+               "C3-B3 chords, C4-B4 passing, repeating every two octaves");
+        bool allLead = true;
+        juce::String bad;
+        for (int index = 0; index < ChordPresets::count(); ++index)
+        {
+            set (k, "chordSet", (float) index);
+            for (int pc = 0; pc < 12; ++pc)
+            {
+                const auto main = k.chordForKey (pc, 0), passing = k.chordForKey (pc, 0, true);
+                if (passing.notes.size() < 3 || passing.name == main.name) { allLead = false; bad << index << ":" << pc << " "; }
+            }
+        }
+        check (allLead, "every built-in preset has a passing chord on every key", bad);
+        set (k, "chordSet", 0.0f);
+        const auto target = k.chordForKey (0, 0), lead = k.chordForKey (0, 0, true);
+        const bool majorTarget = ChordQ::info (target.quality).family == ChordQ::major;
+        check (! majorTarget || (lead.root == (target.root + 7) % 12 && ChordQ::info (lead.quality).family == ChordQ::dominant),
+               "a major chord's passing chord is its V", target.name + " <- " + lead.name);
+
+        // Key & Scale sets and saved presets get them too
+        set (k, "chordSet", (float) SoulKeysProcessor::scaleSlot);
+        check (k.chordForKey (0, 0, true).notes.size() >= 3, "Key & Scale chords have passing chords", k.chordForKey (0, 0, true).name);
+
+        // Hand-picked passing chords in a preset file win over the automatic ones
+        ChordSet ps;
+        const juce::String json = R"({"name":"Passing test","white":["Dmaj9","Em9","F#m7","Gmaj9","A13","Bm9","C#m7b5"],"passing":[{"key":"C","chord":"Eb13"}]})";
+        juce::String error;
+        check (PresetFile::fromJson (json, ps, error) && ps.passing[0].name == "Eb13" && ps.passing[2].isEmpty(), "preset files can hand-pick passing chords", error);
+        ChordSet back;
+        PresetFile::fromJson (PresetFile::toJson (ps), back, error);
+        check (back.passing[0].name == "Eb13", "passing chords survive saving", back.passing[0].name);
+        auto saved = k.zoneChordsAsSet (0);
+        check (! saved.passing[5].isEmpty(), "saving a zone as a preset writes its passing chords", saved.passing[5].name);
+
+        // Split: zone B's main octave starts at the split, zone A's two octaves below
+        set (k, "split", 1.0f);
+        set (k, "splitPoint", 60.0f);
+        check (! k.isPassingKey (60) && k.isPassingKey (72) && ! k.isPassingKey (36) && k.isPassingKey (48), "split zones each get chords + passing octaves");
     }
 
     // 14b. Silence when nothing plays (no tape hiss leaking from an unused zone)

@@ -17,7 +17,7 @@ private:
     const KeysSkin* current = &KeysSkin::all().front();
 };
 
-// One octave drawn large, with the chord each key plays written on it.
+// The main octave and the passing octave drawn large, with the chord each key plays written on it.
 class ChordMapView : public juce::Component
 {
 public:
@@ -33,8 +33,10 @@ private:
     const int zone;
     juce::Colour suggestColour { 0xff3ddc97 };
     const KeysSkin* skin = &KeysSkin::all().front();
-    std::array<juce::String, 12> names, noteText;
-    std::array<bool, 12> held {}, suggested {};
+    std::array<juce::String, 24> names, noteText; // 0-11 main octave, 12-23 passing octave
+    std::array<bool, 24> held {};
+    std::array<bool, 12> suggested {};
+    juce::String mainLabel, passingLabel;
     juce::String suggestionText;
     int last = -1;
 };

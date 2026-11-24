@@ -21,18 +21,26 @@ namespace PresetFile
         root->setProperty ("version", 1);
         root->setProperty ("name", set.name);
         if (set.tonic >= 0) root->setProperty ("tonic", ChordQ::noteName (set.tonic));
-        juce::Array<juce::var> chords;
-        for (size_t pc = 0; pc < 12; ++pc)
+        auto list = [] (const std::array<Chord, 12>& group)
         {
-            const auto& c = set.chords[pc];
-            auto* o = new juce::DynamicObject();
-            o->setProperty ("key", keyNames[pc]);
-            o->setProperty ("chord", c.name);
-            juce::Array<juce::var> notes;
-            for (int n : c.notes) notes.add (n);
-            o->setProperty ("notes", notes);
-            chords.add (juce::var (o));
-        }
+            juce::Array<juce::var> out;
+            for (size_t pc = 0; pc < 12; ++pc)
+            {
+                const auto& c = group[pc];
+                if (c.isEmpty()) continue;
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("key", keyNames[pc]);
+                o->setProperty ("chord", c.name);
+                juce::Array<juce::var> notes;
+                for (int n : c.notes) notes.add (n);
+                o->setProperty ("notes", notes);
+                out.add (juce::var (o));
+            }
+            return out;
+        };
+        const auto chords = list (set.chords);
+        const auto passing = list (set.passing);
+        if (! passing.isEmpty()) root->setProperty ("passing", passing);
         root->setProperty ("chords", chords);
         return juce::JSON::toString (juce::var (root), false);
     }
@@ -71,12 +79,12 @@ namespace PresetFile
         const auto tonic = Voicing::parseName (v.getProperty ("tonic", "").toString() + "maj7");
         out.tonic = tonic.root;
 
-        bool blackGiven = false;
-        if (auto* chords = v.getProperty ("chords", {}).getArray())
+        // A list of chords, each either {"key": "C", "chord": "..."} or a plain name in key order C, C#, D ...
+        auto readList = [] (const juce::Array<juce::var>& items, std::array<Chord, 12>& into)
         {
-            for (int i = 0; i < chords->size(); ++i)
+            for (int i = 0; i < items.size(); ++i)
             {
-                const auto& item = chords->getReference (i);
+                const auto& item = items.getReference (i);
                 int pc = i;
                 const auto key = item.isObject() ? item.getProperty ("key", "").toString().trim() : juce::String();
                 for (size_t k = 0; k < 12; ++k)
@@ -87,11 +95,13 @@ namespace PresetFile
                 if (key.equalsIgnoreCase ("Ab")) pc = 8;
                 if (key.equalsIgnoreCase ("Bb")) pc = 10;
                 if (pc < 0 || pc > 11) continue;
-                out.chords[(size_t) pc] = chordFromVar (item);
-                if (std::find (ChordPresets::blackPcs.begin(), ChordPresets::blackPcs.end(), pc) != ChordPresets::blackPcs.end() && ! out.chords[(size_t) pc].isEmpty())
-                    blackGiven = true;
+                into[(size_t) pc] = chordFromVar (item);
             }
-        }
+        };
+
+        bool blackGiven = false;
+        if (auto* chords = v.getProperty ("chords", {}).getArray())
+            readList (*chords, out.chords);
         else
         {
             if (auto* white = v.getProperty ("white", {}).getArray())
@@ -104,6 +114,10 @@ namespace PresetFile
                     blackGiven = blackGiven || ! out.chords[(size_t) ChordPresets::blackPcs[(size_t) i]].isEmpty();
                 }
         }
+
+        // Optional hand-picked passing chords (any left out are made automatically)
+        if (auto* passing = v.getProperty ("passing", {}).getArray())
+            readList (*passing, out.passing);
 
         // White keys must all be filled
         juce::StringArray missing;

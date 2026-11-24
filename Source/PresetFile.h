@@ -7,6 +7,8 @@
 //   simple:  { "name": "...", "white": [7 chord names for C D E F G A B], "black": [5 names for C# D# F# G# A#] }
 //            (black is optional - related chords are added automatically)
 //   full:    { "name": "...", "chords": [ { "key": "C", "chord": "Ebmaj9", "notes": [...] }, ... ] }
+// Either way, "passing" can list hand-picked chords for the passing octave, e.g.
+//            "passing": [ { "key": "C", "chord": "G13" }, ... ]   (keys left out get an automatic passing chord)
 namespace PresetFile
 {
     juce::File folder();                                   // Documents/Dodge City Plugins/Soul Keys/Presets

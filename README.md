@@ -1,8 +1,8 @@
 # Rashon Soul Keys
 
 A VST3 instrument by Dodge City Plugins: play lush neo soul and R&B chords with one key.
-White keys play the chords of a chord set; black keys play related chords that lead into the
-next one. Includes 50 chord sets, a 7th / 9th / 11th extensions switch, 6 electric piano and
+One octave (C3 - B3) plays the chords of a chord set; the next octave (C4 - B4) plays passing chords
+that lead into the chord on the same key below. Includes 50 chord sets, a 7th / 9th / 11th extensions switch, 6 electric piano and
 4 tape piano sounds, strum, humanize, voice leading, and chord pulling from MIDI and audio files.
 
 ![Rashon Soul Keys](docs/screenshot.png)

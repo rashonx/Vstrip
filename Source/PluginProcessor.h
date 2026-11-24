@@ -79,14 +79,22 @@ public:
     int splitPoint() const { return juce::roundToInt (param (splitPointParam)); }
     int zoneOf (int key) const { return splitOn() && key >= splitPoint() ? 1 : 0; }
 
-    // The chord a key would play right now, for the display
-    Chord chordForKey (int pitchClass, int zone) const;
+    // Two-octave layout: a main octave with the preset's chords, then a passing octave whose keys lead into
+    // the chord on the same key. Without split the main octave is C3-B3 and the passing octave C4-B4, repeating
+    // every two octaves; with split, zone B starts its main octave at the first C from the split point and
+    // zone A starts two octaves below that.
+    bool isPassingKey (int key) const;
+    int mainOctaveStart (int zone) const;
+
+    // The chord a key would play right now, for the display (passing = the passing-octave key)
+    Chord chordForKey (int pitchClass, int zone, bool passing = false) const;
 
     void applySoundPreset (int zone, int index);
     void swapZones();
 
+    // Key slot = pitch class, plus 12 for the passing octave (0..23)
     std::atomic<int> lastKeyPc[numZones] { -1, -1 };
-    std::atomic<bool> keyHeld[numZones][12] {};
+    std::atomic<bool> keyHeld[numZones][24] {};
 
 private:
     struct Pending { double time; int note; float velocity; int sourceKey; int zone; };
@@ -114,8 +122,9 @@ private:
 
     float param (std::atomic<float>* p) const { return p->load(); }
     float param (const char* id) const { return apvts.getRawParameterValue (id)->load(); }
-    Chord pickChord (int zone, int pc, bool forDisplay) const;
+    Chord pickChord (int zone, int pc, bool forDisplay, bool passing = false) const;
     Chord resolveChord (int key, int zone, std::vector<int>* previousUpper, bool forDisplay) const;
+    Chord resolveSlot (int pc, bool passing, int zone, std::vector<int>* previousUpper, bool forDisplay) const;
     void handleKeyOn (int key, float velocity, int samplePos);
     void handleKeyOff (int key, int samplePos);
     void emitDue (int numSamples);
@@ -136,6 +145,7 @@ private:
     std::vector<Pending> pending;
     std::array<std::vector<int>, 128> notesFromKey;
     std::array<int, 128> keyZone {};
+    std::array<int, 128> keySlot = [] { std::array<int, 128> a; a.fill (-1); return a; }();
     std::vector<int> lastUpper; // shared by both zones, so moves between them stay smooth
     double blockStart = 0.0;
     bool strumUp = true;

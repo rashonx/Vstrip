@@ -91,26 +91,30 @@ void KeysLookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, 
 
 void ChordMapView::refresh()
 {
-    for (int pc = 0; pc < 12; ++pc)
+    for (int slot = 0; slot < 24; ++slot)
     {
-        const auto c = processor.chordForKey (pc, zone);
-        names[(size_t) pc] = c.name;
+        const auto c = processor.chordForKey (slot % 12, zone, slot >= 12);
+        names[(size_t) slot] = c.name;
         juce::StringArray notes;
         for (int n : c.notes)
             notes.add (juce::MidiMessage::getMidiNoteName (n, false, true, 4));
-        noteText[(size_t) pc] = notes.joinIntoString (" ");
-        held[(size_t) pc] = processor.keyHeld[zone][pc].load();
+        noteText[(size_t) slot] = notes.joinIntoString (" ");
+        held[(size_t) slot] = processor.keyHeld[zone][slot].load();
     }
     last = processor.lastKeyPc[zone].load();
+    const int start = processor.mainOctaveStart (zone);
+    mainLabel = "CHORDS  " + juce::MidiMessage::getMidiNoteName (start, true, true, 4) + " - " + juce::MidiMessage::getMidiNoteName (start + 11, true, true, 4);
+    passingLabel = "PASSING CHORDS  " + juce::MidiMessage::getMidiNoteName (start + 12, true, true, 4) + " - " + juce::MidiMessage::getMidiNoteName (start + 23, true, true, 4)
+                   + "  (lead into the same key below)";
 
-    // Next-chord suggestions: the 3 best-scoring keys after the last chord
+    // Next-chord suggestions: the 3 best-scoring main-octave keys after the last chord
     suggested.fill (false);
     suggestionText.clear();
     if (last >= 0 && processor.apvts.getRawParameterValue ("suggest")->load() > 0.5f)
     {
         std::array<Chord, 12> options;
         for (int pc = 0; pc < 12; ++pc) options[(size_t) pc] = processor.chordForKey (pc, zone);
-        const auto scores = Suggest::score (options[(size_t) last], options);
+        const auto scores = Suggest::score (processor.chordForKey (last % 12, zone, last >= 12), options);
         std::array<int, 12> order;
         std::iota (order.begin(), order.end(), 0);
         std::sort (order.begin(), order.end(), [&] (int a, int b) { return scores[(size_t) a] > scores[(size_t) b]; });
@@ -135,7 +139,7 @@ void ChordMapView::paint (juce::Graphics& g)
     g.setColour (s.display);
     g.fillRoundedRectangle (b, 10.0f);
 
-    auto now = b.removeFromRight (230.0f).reduced (8.0f);
+    auto now = b.removeFromRight (210.0f).reduced (8.0f);
     g.setColour (s.panel);
     g.fillRoundedRectangle (now, 8.0f);
     g.setColour (s.dim);
@@ -148,7 +152,7 @@ void ChordMapView::paint (juce::Graphics& g)
         g.drawFittedText (names[(size_t) last], now.reduced (12.0f).withTrimmedTop (22.0f).withHeight (50.0f).toNearestInt(), juce::Justification::centredLeft, 1);
         g.setColour (s.text);
         g.setFont (juce::FontOptions (11.0f));
-        g.drawFittedText (noteText[(size_t) last], now.reduced (12.0f).withTrimmedTop (64.0f).withHeight (16.0f).toNearestInt(), juce::Justification::topLeft, 1);
+        g.drawFittedText ((last >= 12 ? "Passing  " : "") + noteText[(size_t) last], now.reduced (12.0f).withTrimmedTop (64.0f).withHeight (16.0f).toNearestInt(), juce::Justification::topLeft, 1);
         if (suggestionText.isNotEmpty())
         {
             g.setColour (suggestColour);
@@ -160,61 +164,80 @@ void ChordMapView::paint (juce::Graphics& g)
     {
         g.setColour (s.text.withAlpha (0.6f));
         g.setFont (juce::FontOptions (12.0f));
-        g.drawFittedText ("White keys: the chords.\nBlack keys: related chords that lead into the next one.",
-                          now.reduced (12.0f).withTrimmedTop (24.0f).toNearestInt(), juce::Justification::topLeft, 4);
+        g.drawFittedText ("Left octave: the chords.\nRight octave: passing chords. Each one leads into the chord on the same key in the left octave.",
+                          now.reduced (12.0f).withTrimmedTop (24.0f).toNearestInt(), juce::Justification::topLeft, 5);
     }
 
-    auto keys = b.reduced (10.0f, 8.0f);
-    const float whiteW = keys.getWidth() / 7.0f;
-    for (size_t i = 0; i < 7; ++i)
+    auto keysArea = b.reduced (10.0f, 6.0f);
+    const float gap = 10.0f;
+    const float octaveW = (keysArea.getWidth() - gap) * 0.5f;
+    for (int octave = 0; octave < 2; ++octave)
     {
-        const int pc = ChordPresets::whitePcs[i];
-        auto r = juce::Rectangle<float> (keys.getX() + whiteW * (float) i, keys.getY(), whiteW, keys.getHeight()).reduced (2.0f, 0.0f);
-        const bool on = held[(size_t) pc];
-        g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.4f) : s.whiteTop, 0.0f, r.getY(), on ? zoneColour : s.whiteBottom, 0.0f, r.getBottom(), false));
-        g.fillRoundedRectangle (r, 6.0f);
-        const bool suggestedKey = suggested[(size_t) pc] && ! on;
-        if (suggestedKey)
-        {
-            g.setGradientFill (juce::ColourGradient (s.whiteTop, 0.0f, r.getY(), suggestColour, 0.0f, r.getBottom(), false));
-            g.fillRoundedRectangle (r, 6.0f);
-            g.setColour (suggestColour);
-            g.drawRoundedRectangle (r.reduced (1.5f), 6.0f, 3.5f);
-            g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
-            g.setColour (contrast (suggestColour));
-            auto tag = juce::Rectangle<float> (38.0f, 15.0f).withPosition (r.getX() + 6.0f, r.getBottom() - 21.0f);
-            g.setColour (suggestColour.darker (0.2f));
-            g.fillRoundedRectangle (tag, 4.0f);
-            g.setColour (contrast (suggestColour));
-            g.drawText ("NEXT", tag, juce::Justification::centred);
-        }
-        g.setColour (on ? contrast (zoneColour) : suggestedKey ? contrast (suggestColour.interpolatedWith (s.whiteTop, 0.4f)) : s.whiteText);
-        g.setFont (juce::FontOptions (13.0f, juce::Font::bold));
-        g.drawFittedText (names[(size_t) pc], r.reduced (5.0f).withTrimmedTop (r.getHeight() * 0.58f).toNearestInt(), juce::Justification::centredTop, 2);
-        g.setColour (s.whiteText.withAlpha (0.5f));
-        g.setFont (juce::FontOptions (10.0f));
-        g.drawText (ChordQ::noteName (pc), r.reduced (5.0f).removeFromBottom (12.0f), juce::Justification::centred);
-    }
-    const float blackW = whiteW * 0.64f, blackH = keys.getHeight() * 0.54f;
-    const std::array<float, 5> afterWhite { 1, 2, 4, 5, 6 };
-    for (size_t i = 0; i < 5; ++i)
-    {
-        const int pc = ChordPresets::blackPcs[i];
-        auto r = juce::Rectangle<float> (keys.getX() + whiteW * afterWhite[i] - blackW * 0.5f, keys.getY(), blackW, blackH);
-        const bool on = held[(size_t) pc];
-        g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.3f) : s.blackTop, 0.0f, r.getY(), on ? zoneColour : s.blackBottom, 0.0f, r.getBottom(), false));
-        g.fillRoundedRectangle (r, 5.0f);
-        const bool suggestedKey = suggested[(size_t) pc] && ! on;
-        if (suggestedKey)
-        {
-            g.setGradientFill (juce::ColourGradient (suggestColour.darker (0.5f), 0.0f, r.getY(), suggestColour, 0.0f, r.getBottom(), false));
-            g.fillRoundedRectangle (r, 5.0f);
-            g.setColour (suggestColour.brighter (0.3f));
-            g.drawRoundedRectangle (r.reduced (1.5f), 5.0f, 2.5f);
-        }
-        g.setColour (on ? contrast (zoneColour) : suggestedKey ? contrast (suggestColour) : s.blackText);
+        auto area = juce::Rectangle<float> (keysArea.getX() + (float) octave * (octaveW + gap), keysArea.getY(), octaveW, keysArea.getHeight());
+        const bool passing = octave == 1;
+        const auto tint = passing ? zoneColour.withMultipliedSaturation (0.6f).withAlpha (0.85f) : zoneColour;
+        g.setColour (tint);
         g.setFont (juce::FontOptions (10.5f, juce::Font::bold));
-        g.drawFittedText (names[(size_t) pc], r.reduced (3.0f).withTrimmedTop (r.getHeight() * 0.4f).toNearestInt(), juce::Justification::centredTop, 3);
+        g.drawFittedText (passing ? passingLabel : mainLabel, area.removeFromTop (14.0f).toNearestInt(), juce::Justification::centredLeft, 1);
+        area.removeFromTop (3.0f);
+        if (passing)
+        {
+            g.setColour (tint.withAlpha (0.12f));
+            g.fillRoundedRectangle (area.expanded (3.0f, 2.0f), 6.0f);
+        }
+
+        const int base = passing ? 12 : 0;
+        const float whiteW = area.getWidth() / 7.0f;
+        for (size_t i = 0; i < 7; ++i)
+        {
+            const int pc = ChordPresets::whitePcs[i];
+            const int slot = base + pc;
+            auto r = juce::Rectangle<float> (area.getX() + whiteW * (float) i, area.getY(), whiteW, area.getHeight()).reduced (1.5f, 0.0f);
+            const bool on = held[(size_t) slot];
+            g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.4f) : s.whiteTop, 0.0f, r.getY(), on ? zoneColour : s.whiteBottom, 0.0f, r.getBottom(), false));
+            g.fillRoundedRectangle (r, 5.0f);
+            const bool suggestedKey = ! passing && suggested[(size_t) pc] && ! on;
+            if (suggestedKey)
+            {
+                g.setGradientFill (juce::ColourGradient (s.whiteTop, 0.0f, r.getY(), suggestColour, 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r, 5.0f);
+                g.setColour (suggestColour);
+                g.drawRoundedRectangle (r.reduced (1.5f), 5.0f, 3.0f);
+            }
+            if (passing && ! on)
+            {
+                g.setColour (tint);
+                g.fillRect (r.withHeight (3.0f).withY (r.getBottom() - 3.0f).reduced (4.0f, 0.0f));
+            }
+            g.setColour (on ? contrast (zoneColour) : suggestedKey ? contrast (suggestColour.interpolatedWith (s.whiteTop, 0.4f)) : s.whiteText);
+            g.setFont (juce::FontOptions (11.5f, juce::Font::bold));
+            g.drawFittedText (names[(size_t) slot], r.reduced (3.0f).withTrimmedTop (r.getHeight() * 0.56f).withTrimmedBottom (12.0f).toNearestInt(), juce::Justification::centredTop, 2, 0.8f);
+            g.setColour (s.whiteText.withAlpha (0.5f));
+            g.setFont (juce::FontOptions (9.5f));
+            g.drawText (ChordQ::noteName (pc), r.reduced (4.0f).removeFromBottom (11.0f), juce::Justification::centred);
+        }
+        const float blackW = whiteW * 0.66f, blackH = area.getHeight() * 0.52f;
+        const std::array<float, 5> afterWhite { 1, 2, 4, 5, 6 };
+        for (size_t i = 0; i < 5; ++i)
+        {
+            const int pc = ChordPresets::blackPcs[i];
+            const int slot = base + pc;
+            auto r = juce::Rectangle<float> (area.getX() + whiteW * afterWhite[i] - blackW * 0.5f, area.getY(), blackW, blackH);
+            const bool on = held[(size_t) slot];
+            g.setGradientFill (juce::ColourGradient (on ? zoneColour.brighter (0.3f) : s.blackTop, 0.0f, r.getY(), on ? zoneColour : s.blackBottom, 0.0f, r.getBottom(), false));
+            g.fillRoundedRectangle (r, 4.0f);
+            const bool suggestedKey = ! passing && suggested[(size_t) pc] && ! on;
+            if (suggestedKey)
+            {
+                g.setGradientFill (juce::ColourGradient (suggestColour.darker (0.5f), 0.0f, r.getY(), suggestColour, 0.0f, r.getBottom(), false));
+                g.fillRoundedRectangle (r, 4.0f);
+                g.setColour (suggestColour.brighter (0.3f));
+                g.drawRoundedRectangle (r.reduced (1.5f), 4.0f, 2.0f);
+            }
+            g.setColour (on ? contrast (zoneColour) : suggestedKey ? contrast (suggestColour) : s.blackText);
+            g.setFont (juce::FontOptions (9.5f, juce::Font::bold));
+            g.drawFittedText (names[(size_t) slot], r.reduced (2.0f).withTrimmedTop (r.getHeight() * 0.3f).toNearestInt(), juce::Justification::centredTop, 3, 0.75f);
+        }
     }
 }
 
@@ -224,7 +247,7 @@ void ChordMapView::paint (juce::Graphics& g)
 bool ZoneKeyboard::isSuggested (int note) const
 {
     const int zone = processor.zoneOf (note);
-    return suggested[(size_t) zone][(size_t) (note % 12)];
+    return ! processor.isPassingKey (note) && suggested[(size_t) zone][(size_t) (note % 12)];
 }
 
 juce::Colour ZoneKeyboard::zoneColour (int note) const
@@ -240,6 +263,12 @@ void ZoneKeyboard::drawWhiteNote (int note, juce::Graphics& g, juce::Rectangle<f
     g.fillRect (area);
     g.setColour (zc.withAlpha (processor.splitOn() ? 0.16f : 0.06f));
     g.fillRect (area.withTrimmedTop (area.getHeight() * 0.7f));
+    if (processor.isPassingKey (note))
+    {
+        // Passing-chord octave: a coloured band across the top of its keys
+        g.setColour (zc.withAlpha (0.35f));
+        g.fillRect (area.withHeight (6.0f));
+    }
     if (isSuggested (note) && ! isDown)
     {
         g.setColour (suggestColour.withAlpha (0.75f));
@@ -270,6 +299,11 @@ void ZoneKeyboard::drawBlackNote (int note, juce::Graphics& g, juce::Rectangle<f
     const auto zc = zoneColour (note);
     g.setColour (isDown ? zc : juce::Colour (0xff1c1c1e).interpolatedWith (zc, isOver ? 0.4f : (processor.splitOn() ? 0.18f : 0.06f)));
     g.fillRect (area);
+    if (processor.isPassingKey (note) && ! isDown)
+    {
+        g.setColour (zc.withAlpha (0.6f));
+        g.fillRect (area.withHeight (4.0f));
+    }
     if (isSuggested (note) && ! isDown)
     {
         g.setColour (suggestColour);

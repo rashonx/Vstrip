@@ -473,6 +473,40 @@ namespace ScaleChords
     }
 }
 
+namespace Passing
+{
+    Chord make (const Chord& target)
+    {
+        if (target.root < 0 || target.quality < 0)
+        {
+            // Chord known only by its notes (e.g. pulled from a file): work out what it is first
+            if (target.notes.size() >= 3)
+            {
+                auto id = Voicing::identify (target.notes);
+                if (id.root >= 0 && id.quality >= 0) return make (id);
+            }
+            return {};
+        }
+        int root = target.root, quality = ChordQ::d13;
+        switch (ChordQ::info (target.quality).family)
+        {
+            case ChordQ::major:    root += 7;  quality = ChordQ::d13;   break;
+            case ChordQ::minor:    root += 7;  quality = ChordQ::d13b9; break;
+            case ChordQ::dominant:
+            case ChordQ::sus:      root += 7;  quality = ChordQ::m9;    break;
+            case ChordQ::halfDim:
+            case ChordQ::dim:      root += 11; quality = ChordQ::dim7;  break;
+        }
+        root %= 12;
+        Chord c;
+        c.root = root;
+        c.quality = quality;
+        c.notes = Voicing::make (root, quality, true, 62, nullptr);
+        c.name = Voicing::name (root, quality);
+        return c;
+    }
+}
+
 ChordSet transposeSet (const ChordSet& set, int semitones)
 {
     semitones = ((semitones % 12) + 12) % 12;
@@ -480,8 +514,10 @@ ChordSet transposeSet (const ChordSet& set, int semitones)
     if (semitones == 0) return set;
     ChordSet out = set;
     if (set.tonic >= 0) out.tonic = (set.tonic + semitones + 12) % 12;
-    for (auto& c : out.chords)
+    for (auto* group : { &out.chords, &out.passing })
+    for (auto& c : *group)
     {
+        if (c.isEmpty()) continue;
         if (c.root >= 0 && c.quality >= 0)
         {
             c.root = (c.root + semitones + 12) % 12;

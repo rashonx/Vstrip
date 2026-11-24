@@ -62,12 +62,22 @@ namespace Voicing
 }
 
 // 12 chords: one per key of the octave (index = pitch class: 0 = C, 1 = C#, ...)
+// plus 12 passing chords for the passing octave (an empty one is made automatically, see Passing::make)
 struct ChordSet
 {
     juce::String name;
     int tonic = -1;   // key the set is written in (pitch class), -1 if unknown
     std::array<Chord, 12> chords;
+    std::array<Chord, 12> passing;
 };
+
+// Passing chords: the passing-octave key plays a chord that leads into the main chord on the same key
+//   major target -> its V13      minor target -> its V13(b9)      dominant / sus target -> its ii (m9)
+//   half-diminished / diminished target -> a diminished 7th a half step below
+namespace Passing
+{
+    Chord make (const Chord& target);
+}
 
 // Lush diatonic chords built from a key and scale (white keys = degrees I-VII)
 namespace ScaleChords
