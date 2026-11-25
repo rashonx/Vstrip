@@ -17,13 +17,13 @@ jobs:
       max-parallel: 4
       matrix:
         include:
-          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.0.0", commit: 4119b54 }
-          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.1.0", commit: 26bcb42 }
-          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.2.0", commit: 3c3dfe6 }
-          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.3.0", commit: b89babf }
-          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.3.1", commit: 204dead }
-          - { slug: vocal-sitter, name: "Rashon Vocal Sitter", target: VocalSitter, version: "1.0.0", commit: 797892b }
-          - { slug: vocal-sitter, name: "Rashon Vocal Sitter", target: VocalSitter, version: "2.1.0", commit: 2df8760 }
+          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.0.0", commit: 4119b543cd8d21638be30c60c6d2a920f4eea204 }
+          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.1.0", commit: 26bcb426ed6dc398082175b6a85b601eccb3da09 }
+          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.2.0", commit: 3c3dfe6046bdeade614cccc1b55b2e901819f6d5 }
+          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.3.0", commit: b89babf6d4f103bec552359ea046f649a1b04615 }
+          - { slug: soul-keys, name: "Rashon Soul Keys", target: SoulKeys, version: "1.3.1", commit: 204deadc5b3dcffd350599e63f6307e2f4c002a2 }
+          - { slug: vocal-sitter, name: "Rashon Vocal Sitter", target: VocalSitter, version: "1.0.0", commit: 797892b9cc9c1978a5e45a5e612c0ef6576db71c }
+          - { slug: vocal-sitter, name: "Rashon Vocal Sitter", target: VocalSitter, version: "2.1.0", commit: 2df87609af963ad9b68a4adffaa3e93e98784b56 }
     steps:
       - uses: actions/checkout@v5
         with:
