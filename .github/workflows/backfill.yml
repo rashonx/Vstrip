@@ -65,5 +65,5 @@ jobs:
           $tag = "${{ matrix.slug }}-v$v"
           $zip = "$($name -replace ' ', '-')-v$v-Windows.zip"
           Compress-Archive -Path $folder -DestinationPath $zip -Force
-          $notes = "Older version, rebuilt from the exact code of v$v. Download **$zip** below (under Assets) and unzip it.`n`nCopy the **$name.vst3** folder into ``C:\\Program Files\\Common Files\\VST3\\`` (replace the current one), then rescan plugins in your DAW."
-          gh release create $tag $zip --repo "${{ github.repository }}" --target "$(git rev-parse HEAD)" --title "$name v$v" --notes $notes --latest=false
+          $notes = "Older version, rebuilt from the exact code of v$v (commit ${{ matrix.commit }}). Download **$zip** below (under Assets) and unzip it.`n`nCopy the **$name.vst3** folder into ``C:\\Program Files\\Common Files\\VST3\\`` (replace the current one), then rescan plugins in your DAW."
+          gh release create $tag $zip --repo "${{ github.repository }}" --target "${{ github.sha }}" --title "$name v$v" --notes $notes --latest=false
