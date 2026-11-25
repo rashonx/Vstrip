@@ -38,6 +38,7 @@ jobs:
         run: |
           gh release view "${{ matrix.slug }}-v${{ matrix.version }}" --repo "${{ github.repository }}" *> $null
           "found=$([int]($LASTEXITCODE -eq 0))" >> $env:GITHUB_OUTPUT
+          exit 0
 
       - name: Configure
         if: steps.exists.outputs.found == '0'
