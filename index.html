@@ -93,8 +93,10 @@ const PLUGINS = [
 const RELEASES = "https://github.com/rashonx/Vstrip/releases";
 
 function card(p, releases) {
-  const mine = releases.filter(r => r.tag_name.startsWith(p.tag + "-v") && !r.draft)
-                       .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+  // Newest version first, by version number (older versions can be added to the releases page later)
+  const ver = r => r.tag_name.split("-v").pop().split(".").map(Number);
+  const byVersion = (a, b) => { const x = ver(a), y = ver(b); for (let i = 0; i < 3; i++) if ((y[i] || 0) !== (x[i] || 0)) return (y[i] || 0) - (x[i] || 0); return 0; };
+  const mine = releases.filter(r => r.tag_name.startsWith(p.tag + "-v") && !r.draft).sort(byVersion);
   const latest = mine[0];
   const zip = latest && latest.assets.find(a => a.name.endsWith(".zip"));
   const el = document.createElement("article");
@@ -108,7 +110,7 @@ function card(p, releases) {
       <p class="desc">${p.desc}</p>
       <div class="status">${latest ? `Latest: v${latest.tag_name.split("-v").pop()} &middot; ${new Date(latest.published_at).toLocaleDateString()}${zip ? ` &middot; ${(zip.size / 1048576).toFixed(1)} MB` : ""}` : "Coming soon"}</div>
       <a class="download" ${zip ? `href="${zip.browser_download_url}"` : `aria-disabled="true"`}>${zip ? `Download v${latest.tag_name.split("-v").pop()}` : "Not available yet"}</a>
-      ${mine.length > 1 ? `<details><summary>Older versions</summary><ul>${mine.slice(1).map(r => {
+      ${mine.length > 1 ? `<details><summary>Older versions (${mine.length - 1})</summary><ul>${mine.slice(1).map(r => {
           const a = r.assets.find(x => x.name.endsWith(".zip"));
           return `<li>${a ? `<a href="${a.browser_download_url}">v${r.tag_name.split("-v").pop()}</a>` : `v${r.tag_name.split("-v").pop()}`}</li>`; }).join("")}</ul></details>` : ""}
     </div>`;
