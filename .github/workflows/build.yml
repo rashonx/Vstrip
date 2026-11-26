@@ -22,6 +22,26 @@ jobs:
         shell: bash
         run: echo "number=$(grep -oP '<Version>\K[0-9.]+' src/WheelBridge.csproj)" >> "$GITHUB_OUTPUT"
 
+      - name: Bundle the helper driver installers (ViGEmBus + HidHide) into the app
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          New-Item -ItemType Directory -Force src/drivers, licenses | Out-Null
+          foreach ($d in @(@{ repo = "nefarius/ViGEmBus"; out = "ViGEmBusSetup.exe" }, @{ repo = "nefarius/HidHide"; out = "HidHideSetup.exe" })) {
+            $dir = "dl-$($d.out)"
+            gh release download --repo $d.repo --pattern "*.exe" --dir $dir
+            if ($LASTEXITCODE -ne 0) { throw "Could not download $($d.repo)" }
+            $files = Get-ChildItem "$dir/*.exe"
+            $pick = ($files | Where-Object { $_.Name -match "x64" } | Select-Object -First 1)
+            if (-not $pick) { $pick = $files | Select-Object -First 1 }
+            Write-Host "Bundling $($pick.Name) as $($d.out)"
+            Move-Item $pick.FullName "src/drivers/$($d.out)"
+            $lic = gh api "repos/$($d.repo)/license" --jq .content
+            $name = $d.repo.Split("/")[1]
+            [IO.File]::WriteAllText("licenses/$name LICENSE.txt", [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($lic -join ""))))
+          }
+
       - name: Build single-file app
         run: dotnet publish src/WheelBridge.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o dist
 
@@ -54,6 +74,7 @@ jobs:
           Get-ChildItem dist -Filter *.pdb | Remove-Item
           Rename-Item dist/WheelBridge.exe "WheelBridge v$v.exe"
           Copy-Item SETUP.txt "dist/SETUP v$v.txt"
+          Copy-Item -Recurse licenses "dist/Third-party licenses"
 
       - name: Publish to the Releases page
         if: github.event_name == 'push'

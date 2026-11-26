@@ -8,7 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>WheelBridge</AssemblyName>
     <RootNamespace>WheelBridge</RootNamespace>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Product>Wheel Bridge</Product>
     <Company>Dodge City Plugins</Company>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -20,5 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="logo.png" />
+    <!-- Driver installers, downloaded by the build (see .github/workflows/build.yml) -->
+    <EmbeddedResource Include="drivers\*.exe" LogicalName="drivers.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

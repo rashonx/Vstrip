@@ -31,6 +31,10 @@ public class BridgeSettings
     public int KickbackPct { get; set; } = 40;
     public bool FlipForce { get; set; } = false;
 
+    // v1.2: hide the real wheel from games automatically while the bridge runs
+    public bool AutoHide { get; set; } = true;
+    public bool WheelLeftHidden { get; set; } = false;
+
     public Dictionary<string, int> Buttons { get; set; } = new();
 
     static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Dodge City Plugins", "Wheel Bridge");

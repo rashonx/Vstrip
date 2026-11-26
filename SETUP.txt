@@ -1,24 +1,35 @@
-WHEEL BRIDGE v1.0.0 - Dodge City Plugins
+WHEEL BRIDGE v1.2.0 - Dodge City Plugins
 Moza wheel -> Xbox controller, with a constant centring force
 =============================================================
 
 ONE-TIME SETUP
-1. Install ViGEmBus (creates the virtual Xbox controller):
-     https://github.com/nefarius/ViGEmBus/releases   (run the .exe installer)
-2. Install HidHide (hides the real wheel from games):
-     https://github.com/nefarius/HidHide/releases    (run the .exe installer)
-3. Restart your PC.
+1. Open "WheelBridge vX.Y.Z.exe". Windows asks "Do you want to allow this app to make changes?"
+   - click Yes. (Wheel Bridge needs this to drive the wheel motor and hide the wheel from games.)
+   - Windows may also say "Windows protected your PC" because the app isn't signed.
+     Click "More info" then "Run anyway".
+2. Click INSTALL DRIVERS in section 1. Wheel Bridge installs its two helper drivers by itself
+   (they're built into the app - nothing to download):
+     ViGEmBus - lets Windows show the virtual Xbox controller
+     HidHide  - lets Wheel Bridge hide the real wheel from games
+   Windows only allows drivers to do these two jobs, which is why they're needed.
+3. When it's done, unplug the wheel's USB cable and plug it back in, then click Refresh.
+   If Wheel Bridge says so, restart your PC once.
 4. In Moza Pit House, note your wheel rotation (for example 900 or 540).
+
+HIDING THE WHEEL (automatic)
+- With "Hide the wheel from games while running" ticked (on by default), START BRIDGE hides the
+  real wheel from games, so they only see the Xbox controller. STOP, or closing Wheel Bridge,
+  gives the wheel back to games. If Wheel Bridge is ever closed unexpectedly, it gives the wheel
+  back the next time you open it.
+- "Hide wheel now" / "Show wheel to games" do it by hand.
 
 EVERY TIME YOU PLAY
 1. Open "WheelBridge vX.Y.Z.exe" (the number is the version; delete older copies).
-   - Windows may say "Windows protected your PC" because the app isn't signed.
-     Click "More info" then "Run anyway".
+   - Click Yes when Windows asks for permission.
    - Keep your feet off the pedals while it starts (it calibrates their resting position).
 2. Your Moza should be picked automatically. The centring force starts right away.
    Use the Centring strength slider. Start low on a direct drive base.
-3. First time only: click "Hide wheel from games" and allow the Windows permission prompt.
-   (The game must not see the real wheel, or it will see two controllers.)
+3. Nothing to do for hiding: START BRIDGE hides the real wheel from games automatically.
 4. First time only: map your pedals and buttons in section 3.
    - Pedals: click Detect next to Throttle, press the pedal fully. Same for Brake.
    - Buttons: click Set next to an Xbox button, then press the wheel button you want.
@@ -54,3 +65,7 @@ Click "Show wheel to games" (or uninstall HidHide) so other games can see the Mo
 SAFETY
 Direct drive wheels are strong. Keep hands clear when starting the bridge and raise the
 centring strength gradually.
+
+THIRD-PARTY DRIVERS
+ViGEmBus and HidHide are made by Nefarius Software Solutions and are included unchanged under
+their own licences (see the "Third-party licenses" folder).

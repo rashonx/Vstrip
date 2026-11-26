@@ -5,7 +5,7 @@ namespace WheelBridge;
 
 public sealed class MainForm : Form
 {
-    const string Version = "1.1.0";
+    const string Version = "1.2.0";
     readonly BridgeSettings settings = BridgeSettings.Load();
     readonly Bridge bridge;
     readonly System.Windows.Forms.Timer uiTimer = new() { Interval = 33 };
@@ -14,10 +14,13 @@ public sealed class MainForm : Form
     readonly ComboBox deviceBox = new() { DropDownStyle = ComboBoxStyle.DropDownList };
     readonly Button refreshButton = MakeButton ("Refresh");
     readonly Label wheelStatus = MakeLabel ("");
-    readonly Label vigemStatus = MakeLabel ("");
-    readonly Label hidHideStatus = MakeLabel ("");
-    readonly Button hideButton = MakeButton ("Hide wheel from games");
+    readonly Label driverStatus = MakeLabel ("");
+    readonly CheckBox autoHideBox = new() { Text = "Hide the wheel from games while running", AutoSize = true, ForeColor = Theme.Text };
+    readonly Button installButton = new() { Text = "INSTALL DRIVERS  (one click)", FlatStyle = FlatStyle.Flat, BackColor = Theme.Gold, ForeColor = Color.FromArgb (20, 16, 8),
+                                            Font = new Font ("Segoe UI", 11f, FontStyle.Bold), Cursor = Cursors.Hand, FlatAppearance = { BorderSize = 0 } };
+    readonly Button hideButton = MakeButton ("Hide wheel now");
     readonly Button showButton = MakeButton ("Show wheel to games");
+    bool hiddenByUs, installing;
     readonly Button startButton = new() { FlatStyle = FlatStyle.Flat, Font = new Font ("Segoe UI", 15f, FontStyle.Bold) };
     readonly Label statusLine = MakeLabel ("");
     readonly LiveView live = new();
@@ -59,7 +62,13 @@ public sealed class MainForm : Form
 
         uiTimer.Tick += (_, _) => Tick();
         Load += (_, _) => { RefreshDevices (true); uiTimer.Start(); };
-        FormClosing += (_, _) => { settings.Save(); uiTimer.Stop(); bridge.Dispose(); };
+        FormClosing += (_, _) =>
+        {
+            uiTimer.Stop();
+            if (hiddenByUs) HideWheel (false); // games can use the wheel normally again
+            settings.Save();
+            bridge.Dispose();
+        };
     }
 
     //==========================================================================
@@ -108,7 +117,7 @@ public sealed class MainForm : Form
         title.SetBounds (256, 10, 400, 44);
         Controls.Add (title);
 
-        var sub = MakeLabel ($"MOZA WHEEL  →  XBOX CONTROLLER   ·   CONSTANT CENTRING   ·   FORCE FEEDBACK   ·   v{Version}");
+        var sub = MakeLabel ($"MOZA WHEEL  →  XBOX CONTROLLER   ·   AUTO-HIDE   ·   CONSTANT CENTRING   ·   FORCE FEEDBACK   ·   v{Version}");
         sub.ForeColor = Theme.Dim;
         sub.SetBounds (259, 54, 600, 20);
         Controls.Add (sub);
@@ -128,15 +137,16 @@ public sealed class MainForm : Form
         wheelStatus.SetBounds (540, 38, 190, 22);
         card.Controls.Add (wheelStatus);
 
-        vigemStatus.SetBounds (12, 72, 360, 22);
-        vigemStatus.Cursor = Cursors.Hand;
-        vigemStatus.Click += (_, _) => { if (!VirtualPad.DriverInstalled()) OpenUrl ("https://github.com/nefarius/ViGEmBus/releases"); };
-        card.Controls.Add (vigemStatus);
-        hidHideStatus.SetBounds (12, 98, 360, 22);
-        hidHideStatus.Cursor = Cursors.Hand;
-        hidHideStatus.Click += (_, _) => { if (!HidHide.Installed()) OpenUrl ("https://github.com/nefarius/HidHide/releases"); };
-        card.Controls.Add (hidHideStatus);
+        driverStatus.SetBounds (12, 72, 360, 22);
+        card.Controls.Add (driverStatus);
+        autoHideBox.Checked = settings.AutoHide;
+        autoHideBox.Location = new Point (12, 98);
+        autoHideBox.CheckedChanged += (_, _) => { settings.AutoHide = autoHideBox.Checked; settings.Save(); };
+        card.Controls.Add (autoHideBox);
 
+        installButton.SetBounds (380, 72, 348, 48);
+        installButton.Click += (_, _) => InstallDrivers();
+        card.Controls.Add (installButton);
         hideButton.SetBounds (380, 72, 170, 48);
         hideButton.Click += (_, _) => RunHidHide (true);
         card.Controls.Add (hideButton);
@@ -341,6 +351,8 @@ public sealed class MainForm : Form
             return;
         }
         settings.DeviceName = devices[i].InstanceName.Trim();
+        if (settings.WheelLeftHidden && !bridge.IsBridging && HidHide.Installed())
+            HideWheel (false); // Wheel Bridge was closed while the wheel was hidden: give it back to games
         bridge.StartLoop();
         Status (bridge.Wheel.HasForceFeedback
             ? "Wheel connected. Centring force is active. Keep your feet off the pedals for a second while it calibrates."
@@ -348,17 +360,56 @@ public sealed class MainForm : Form
         UpdateSetupStatus();
     }
 
+    // Hides or shows the real wheel to games. Wheel Bridge itself always keeps seeing it.
+    string HideWheel (bool hide)
+    {
+        if (!bridge.Wheel.IsOpen || bridge.Wheel.InterfacePath.Length == 0) return "Connect the wheel first";
+        if (!HidHide.Installed()) return "HidHide isn't installed (click INSTALL DRIVERS)";
+        var error = hide ? HidHide.Hide (bridge.Wheel.InterfacePath) : HidHide.Unhide (bridge.Wheel.InterfacePath);
+        if (error.Length == 0)
+        {
+            hiddenByUs = hide;
+            settings.WheelLeftHidden = hide; // if Wheel Bridge is closed unexpectedly, it shows the wheel again next time
+            settings.Save();
+        }
+        return error;
+    }
+
     void RunHidHide (bool hide)
     {
-        if (!bridge.Wheel.IsOpen || bridge.Wheel.InterfacePath.Length == 0)
+        var error = HideWheel (hide);
+        Status (error.Length > 0
+            ? $"Hiding the wheel: {error}."
+            : hide ? "The wheel is now hidden from games. Wheel Bridge can still see it." : "The wheel is visible to games again.");
+        UpdateSetupStatus();
+    }
+
+    void InstallDrivers()
+    {
+        if (installing) return;
+        if (!DriverSetup.Bundled (DriverSetup.ViGEmResource) || !DriverSetup.Bundled (DriverSetup.HidHideResource))
         {
-            Status ("Connect the wheel first.");
+            // Only happens in a home-made build without the drivers inside
+            if (!VirtualPad.DriverInstalled()) OpenUrl ("https://github.com/nefarius/ViGEmBus/releases");
+            if (!HidHide.Installed()) OpenUrl ("https://github.com/nefarius/HidHide/releases");
+            Status ("This copy doesn't include the drivers, so their download pages were opened.");
             return;
         }
-        var error = hide ? HidHide.Hide (bridge.Wheel.InterfacePath) : HidHide.Unhide (bridge.Wheel.InterfacePath);
-        Status (error.Length > 0
-            ? $"HidHide: {error}. You can also do it by hand in the HidHide Configuration Client: add WheelBridge.exe under Applications, tick your Moza under Devices, and enable hiding."
-            : hide ? "The wheel is now hidden from games. Wheel Bridge can still see it." : "The wheel is visible to games again.");
+        installing = true;
+        installButton.Enabled = false;
+        installButton.Text = "INSTALLING...";
+        Task.Run (() =>
+        {
+            var result = DriverSetup.InstallMissing (msg => BeginInvoke (() => Status (msg)));
+            BeginInvoke (() =>
+            {
+                installing = false;
+                installButton.Enabled = true;
+                installButton.Text = "INSTALL DRIVERS  (one click)";
+                Status (result);
+                RefreshDevices (true);
+            });
+        });
     }
 
     void ToggleBridge()
@@ -366,7 +417,8 @@ public sealed class MainForm : Form
         if (bridge.IsBridging)
         {
             bridge.StopBridging();
-            Status ("Bridge stopped. The virtual Xbox controller was unplugged.");
+            var shown = hiddenByUs && HideWheel (false).Length == 0;
+            Status ("Bridge stopped. The virtual Xbox controller was unplugged." + (shown ? " The wheel is visible to games again." : ""));
         }
         else
         {
@@ -376,9 +428,15 @@ public sealed class MainForm : Form
                 return;
             }
             var error = bridge.StartBridging();
+            var hideNote = "";
+            if (error.Length == 0 && settings.AutoHide)
+            {
+                var hideError = HideWheel (true);
+                hideNote = hideError.Length == 0 ? " The real wheel is hidden from games until you stop." : $" (Couldn't hide the real wheel: {hideError}.)";
+            }
             Status (error.Length > 0
-                ? $"Could not create the Xbox controller: {error}. Install ViGEmBus (click its line in Setup), then restart Wheel Bridge."
-                : "Running. Games now see an Xbox 360 controller driven by your wheel. Start Need for Speed.");
+                ? $"Could not create the Xbox controller: {error}. Click INSTALL DRIVERS, then restart Wheel Bridge."
+                : "Running. Games now see an Xbox 360 controller driven by your wheel. Start Need for Speed." + hideNote);
         }
         settings.Save();
         UpdateStartButton();
@@ -399,13 +457,17 @@ public sealed class MainForm : Form
         wheelStatus.ForeColor = open ? Theme.Green : Theme.Red;
 
         var vigem = VirtualPad.DriverInstalled();
-        vigemStatus.Text = vigem ? "✓ ViGEmBus driver installed" : "✗ ViGEmBus driver missing - click here to download";
-        vigemStatus.ForeColor = vigem ? Theme.Green : Theme.Red;
-
         var hh = HidHide.Installed();
-        hidHideStatus.Text = hh ? "✓ HidHide installed" : "✗ HidHide missing - click here to download";
-        hidHideStatus.ForeColor = hh ? Theme.Green : Theme.Red;
+        driverStatus.Text = vigem && hh ? "✓ Drivers ready"
+                          : vigem ? "✗ HidHide driver missing - click INSTALL DRIVERS"
+                          : hh ? "✗ ViGEmBus driver missing - click INSTALL DRIVERS"
+                          : "✗ Helper drivers not installed - click INSTALL DRIVERS";
+        if (vigem && hh) driverStatus.Text += hiddenByUs ? "   ·   wheel hidden from games" : "   ·   wheel visible to games";
+        driverStatus.ForeColor = vigem && hh ? Theme.Green : Theme.Red;
+        installButton.Visible = !(vigem && hh);
+        hideButton.Visible = showButton.Visible = vigem && hh;
         hideButton.Enabled = showButton.Enabled = hh && open;
+        autoHideBox.Enabled = hh;
     }
 
     void RefreshButtonLabels()

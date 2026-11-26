@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace WheelBridge;
 
-// Hides the real wheel from games (but not from Wheel Bridge) using the free HidHide tool.
+// Hides the real wheel from games (but not from Wheel Bridge) using the HidHide driver (installed by Wheel Bridge).
 public static class HidHide
 {
     public static string? FindCli()
@@ -28,20 +28,16 @@ public static class HidHide
         return p.Replace ('#', '\\').ToUpperInvariant();
     }
 
-    // Runs HidHideCLI with admin rights (Windows will ask for permission once).
+    // Runs HidHideCLI. Wheel Bridge runs as administrator, so this needs no extra prompt.
     static string Run (string arguments)
     {
         var cli = FindCli();
         if (cli == null) return "HidHide is not installed";
         try
         {
-            using var proc = Process.Start (new ProcessStartInfo (cli, arguments) { UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden });
+            using var proc = Process.Start (new ProcessStartInfo (cli, arguments) { UseShellExecute = false, CreateNoWindow = true });
             proc?.WaitForExit (15000);
             return proc == null ? "Could not start HidHide" : proc.ExitCode == 0 ? "" : $"HidHide returned code {proc.ExitCode}";
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            return "Permission was declined";
         }
         catch (Exception e)
         {
