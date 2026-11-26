@@ -117,9 +117,9 @@ public sealed class MainForm : Form
         title.SetBounds (256, 10, 400, 44);
         Controls.Add (title);
 
-        var sub = MakeLabel ($"MOZA WHEEL  →  XBOX CONTROLLER   ·   AUTO-HIDE   ·   CONSTANT CENTRING   ·   FORCE FEEDBACK   ·   v{Version}");
+        var sub = MakeLabel ($"MOZA WHEEL  →  XBOX CONTROLLER   ·   AUTO-HIDE   ·   CENTRING   ·   FORCE FEEDBACK   ·   v{Version}");
         sub.ForeColor = Theme.Dim;
-        sub.SetBounds (259, 54, 600, 20);
+        sub.SetBounds (259, 54, 725, 20);
         Controls.Add (sub);
     }
 
