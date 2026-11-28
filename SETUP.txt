@@ -1,4 +1,4 @@
-WHEEL BRIDGE v1.3.0 - Dodge City Plugins
+WHEEL BRIDGE v1.3.1 - Dodge City Plugins
 Moza wheel -> Xbox controller, with a constant centring force
 =============================================================
 
@@ -50,6 +50,16 @@ COMBINED PEDAL AXIS (section 3, new in v1.3)
 - "Gas + brake on one axis": tick this if your pedals report both on ONE axis that rests in
   the middle. Pick that axis as Throttle (the Brake box is then ignored). Feet off, then press
   gas and brake all the way once each. If they come out backwards, tick Swap.
+
+IF THE GAME DOESN'T SEE THE XBOX CONTROLLER
+1. Section 1 must say "Drivers ready". If not, click INSTALL DRIVERS, then restart your PC.
+2. Your Moza must show in the Wheel box. If it says "No wheel found", click "Show wheel to games",
+   then Refresh.
+3. Click START BRIDGE - it must turn green and say RUNNING.
+4. Click "Check the Xbox controller in Windows". The list must show
+   "Controller (XBOX 360 For Windows)". Select it, click Properties, and turn the wheel.
+5. Start the game AFTER the bridge is running. In the game's settings, pick the gamepad /
+   controller (not keyboard).
 
 TUNING
 - "Wheel rotation set in Moza Pit House": must match Pit House.

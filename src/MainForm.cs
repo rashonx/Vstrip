@@ -5,7 +5,7 @@ namespace WheelBridge;
 
 public sealed class MainForm : Form
 {
-    const string Version = "1.3.0";
+    const string Version = "1.3.1";
     readonly BridgeSettings settings = BridgeSettings.Load();
     readonly Bridge bridge;
     readonly System.Windows.Forms.Timer uiTimer = new() { Interval = 33 };
@@ -20,6 +20,7 @@ public sealed class MainForm : Form
                                             Font = new Font ("Segoe UI", 11f, FontStyle.Bold), Cursor = Cursors.Hand, FlatAppearance = { BorderSize = 0 } };
     readonly Button hideButton = MakeButton ("Hide wheel now");
     readonly Button showButton = MakeButton ("Show wheel to games");
+    readonly Button checkButton = MakeButton ("Check the Xbox controller in Windows");
     bool hiddenByUs, installing;
     readonly Button startButton = new() { FlatStyle = FlatStyle.Flat, Font = new Font ("Segoe UI", 15f, FontStyle.Bold) };
     readonly Label statusLine = MakeLabel ("");
@@ -61,7 +62,13 @@ public sealed class MainForm : Form
         Controls.Add (statusLine);
 
         uiTimer.Tick += (_, _) => Tick();
-        Load += (_, _) => { RefreshDevices (true); uiTimer.Start(); };
+        Load += (_, _) =>
+        {
+            // Let this copy see the wheel even if an older Wheel Bridge (different file name) hid it
+            if (HidHide.Installed()) HidHide.RegisterApp();
+            RefreshDevices (true);
+            uiTimer.Start();
+        };
         FormClosing += (_, _) =>
         {
             uiTimer.Stop();
@@ -147,10 +154,19 @@ public sealed class MainForm : Form
         installButton.SetBounds (380, 72, 348, 48);
         installButton.Click += (_, _) => InstallDrivers();
         card.Controls.Add (installButton);
-        hideButton.SetBounds (380, 72, 170, 48);
+        hideButton.SetBounds (380, 72, 170, 22);
         hideButton.Click += (_, _) => RunHidHide (true);
         card.Controls.Add (hideButton);
-        showButton.SetBounds (558, 72, 170, 48);
+        showButton.SetBounds (558, 72, 170, 22);
+        checkButton.SetBounds (380, 98, 348, 22);
+        checkButton.Click += (_, _) =>
+        {
+            try { Process.Start (new ProcessStartInfo ("joy.cpl") { UseShellExecute = true }); } catch { }
+            Status (bridge.IsBridging
+                ? "Windows' game controller list is open. While the bridge runs it should show \"Controller (XBOX 360 For Windows)\". Select it and click Properties to see the stick move as you steer."
+                : "Windows' game controller list is open. Click START BRIDGE and \"Controller (XBOX 360 For Windows)\" should appear in it.");
+        };
+        card.Controls.Add (checkButton);
         showButton.Click += (_, _) => RunHidHide (false);
         card.Controls.Add (showButton);
 
@@ -370,7 +386,7 @@ public sealed class MainForm : Form
         if (pick >= 0 && autoConnect) deviceBox.SelectedIndex = pick;
         else if (pick >= 0) deviceBox.SelectedIndex = pick;
         if (devices.Count == 0)
-            Status ("No wheel found. Plug in the Moza base, close Pit House if it is blocking, then click Refresh. If the wheel is hidden by HidHide, click 'Show wheel to games' first.");
+            Status ("No wheel found. Plug in the Moza base, close Pit House if it is blocking, then click Refresh. Still nothing? Click 'Show wheel to games', then Refresh.");
         UpdateSetupStatus();
     }
 
@@ -399,6 +415,13 @@ public sealed class MainForm : Form
     // Hides or shows the real wheel to games. Wheel Bridge itself always keeps seeing it.
     string HideWheel (bool hide)
     {
+        if (!hide && HidHide.Installed() && (!bridge.Wheel.IsOpen || bridge.Wheel.InterfacePath.Length == 0))
+        {
+            // Wheel not found (maybe hidden by an older copy): switch hiding off altogether
+            var off = HidHide.CloakOff();
+            if (off.Length == 0) { hiddenByUs = false; settings.WheelLeftHidden = false; settings.Save(); }
+            return off;
+        }
         if (!bridge.Wheel.IsOpen || bridge.Wheel.InterfacePath.Length == 0) return "Connect the wheel first";
         if (!HidHide.Installed()) return "HidHide isn't installed (click INSTALL DRIVERS)";
         var error = hide ? HidHide.Hide (bridge.Wheel.InterfacePath) : HidHide.Unhide (bridge.Wheel.InterfacePath);
@@ -472,7 +495,7 @@ public sealed class MainForm : Form
             }
             Status (error.Length > 0
                 ? $"Could not create the Xbox controller: {error}. Click INSTALL DRIVERS, then restart Wheel Bridge."
-                : "Running. Games now see an Xbox 360 controller driven by your wheel. Start Need for Speed." + hideNote);
+                : $"Running. Windows now has an Xbox 360 controller{(bridge.Pad.PlayerNumber > 0 ? $" (controller {bridge.Pad.PlayerNumber})" : "")} driven by your wheel. Start the game." + hideNote);
         }
         settings.Save();
         UpdateStartButton();
@@ -502,7 +525,9 @@ public sealed class MainForm : Form
         driverStatus.ForeColor = vigem && hh ? Theme.Green : Theme.Red;
         installButton.Visible = !(vigem && hh);
         hideButton.Visible = showButton.Visible = vigem && hh;
-        hideButton.Enabled = showButton.Enabled = hh && open;
+        hideButton.Enabled = hh && open;
+        showButton.Enabled = hh;
+        checkButton.Visible = vigem && hh;
         autoHideBox.Enabled = hh;
     }
 

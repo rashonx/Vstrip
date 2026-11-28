@@ -51,5 +51,16 @@ public static class HidHide
         return Run ($"--app-reg \"{exe}\" --dev-hide \"{InstancePathFrom (interfacePath)}\" --cloak-on");
     }
 
+    // Tells HidHide that this copy of Wheel Bridge may always see hidden devices.
+    // Each version has its own file name, so this runs every time Wheel Bridge opens.
+    public static string RegisterApp()
+    {
+        var exe = Environment.ProcessPath ?? Application.ExecutablePath;
+        return Run ($"--app-reg \"{exe}\"");
+    }
+
+    // Emergency: turn hiding off for every device (used when the wheel can't be found to un-hide it on its own)
+    public static string CloakOff() => Run ("--cloak-off");
+
     public static string Unhide (string interfacePath) => Run ($"--dev-unhide \"{InstancePathFrom (interfacePath)}\"");
 }

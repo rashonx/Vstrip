@@ -24,6 +24,16 @@ public sealed class VirtualPad : IDisposable
     public float SmallMotor { get; private set; }
     public bool IsConnected => pad != null;
 
+    // Which Xbox controller number Windows gave it (1-4), or 0 if Windows hasn't reported one
+    public int PlayerNumber
+    {
+        get
+        {
+            try { return pad == null ? 0 : pad.UserIndex + 1; }
+            catch { return 0; }
+        }
+    }
+
     public static bool DriverInstalled()
     {
         try { using var c = new ViGEmClient(); return true; }
