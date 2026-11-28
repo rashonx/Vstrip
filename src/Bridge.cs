@@ -27,6 +27,7 @@ public sealed class Bridge : IDisposable
     // Pedal calibration: resting value and the farthest value seen from it, per axis
     readonly int[] rest = new int[Wheel.AxisNames.Length];
     readonly int[] far = new int[Wheel.AxisNames.Length];
+    readonly int[] lo = new int[Wheel.AxisNames.Length], hi = new int[Wheel.AxisNames.Length]; // shared gas/brake axis
     volatile bool captureRest = true;
 
     public bool IsBridging => bridging;
@@ -98,7 +99,7 @@ public sealed class Bridge : IDisposable
                     AxisRaw[i] = Wheel.AxisValue (s, Wheel.AxisNames[i]);
                 if (captureRest)
                 {
-                    for (var i = 1; i < AxisRaw.Length; ++i) { rest[i] = AxisRaw[i]; far[i] = AxisRaw[i]; }
+                    for (var i = 1; i < AxisRaw.Length; ++i) { rest[i] = AxisRaw[i]; far[i] = AxisRaw[i]; lo[i] = AxisRaw[i]; hi[i] = AxisRaw[i]; }
                     captureRest = false;
                 }
 
@@ -114,8 +115,19 @@ public sealed class Bridge : IDisposable
                 if (mag > 0.0005f) mag = adz + (1f - adz) * mag;
                 StickOut = Math.Sign (stick) * Math.Min (1f, mag);
 
-                Throttle = PedalValue (s, cfg.ThrottleAxis);
-                Brake = PedalValue (s, cfg.BrakeAxis);
+                var sharedIndex = Array.IndexOf (Wheel.AxisNames, cfg.ThrottleAxis);
+                if (cfg.SharedPedalAxis && sharedIndex > 0)
+                {
+                    // Gas and brake on one axis that rests in the middle
+                    var (gas, brk) = PedalMix.SplitShared (AxisRaw[sharedIndex], rest[sharedIndex], ref lo[sharedIndex], ref hi[sharedIndex], cfg.SwapSharedPedals);
+                    Throttle = gas;
+                    Brake = brk;
+                }
+                else
+                {
+                    Throttle = PedalValue (s, cfg.ThrottleAxis);
+                    Brake = PedalValue (s, cfg.BrakeAxis);
+                }
                 Clutch = PedalValue (s, cfg.ClutchAxis);
 
                 var buttons = s.Buttons;
@@ -126,7 +138,7 @@ public sealed class Bridge : IDisposable
                 {
                     var mapped = VirtualPad.ButtonList.Select (x =>
                         (x.Button, cfg.Buttons.TryGetValue (x.Name, out var idx) && idx >= 0 && idx < ButtonsDown.Length && ButtonsDown[idx]));
-                    Pad.Send ((short) Math.Round (StickOut * 32767f), (byte) Math.Round (Throttle * 255f), (byte) Math.Round (Brake * 255f), mapped);
+                    Pad.Send ((short) Math.Round (StickOut * 32767f), PedalMix.Map (cfg.PedalOutputMode, Throttle, Brake), mapped);
                 }
 
                 // Motor forces, refreshed 100 times a second (only sent when something changed)

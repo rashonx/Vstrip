@@ -54,13 +54,15 @@ public sealed class VirtualPad : IDisposable
         }
     }
 
-    public void Send (short steering, byte throttle, byte brake, IEnumerable<(Xbox360Button Button, bool Pressed)> buttons)
+    public void Send (short steering, PedalMix.Output pedals, IEnumerable<(Xbox360Button Button, bool Pressed)> buttons)
     {
         if (pad == null) return;
         pad.SetAxisValue (Xbox360Axis.LeftThumbX, steering);
-        pad.SetAxisValue (Xbox360Axis.LeftThumbY, 0);
-        pad.SetSliderValue (Xbox360Slider.RightTrigger, throttle);
-        pad.SetSliderValue (Xbox360Slider.LeftTrigger, brake);
+        pad.SetAxisValue (Xbox360Axis.LeftThumbY, pedals.LeftY);
+        pad.SetAxisValue (Xbox360Axis.RightThumbX, 0);
+        pad.SetAxisValue (Xbox360Axis.RightThumbY, pedals.RightY);
+        pad.SetSliderValue (Xbox360Slider.RightTrigger, pedals.RightTrigger);
+        pad.SetSliderValue (Xbox360Slider.LeftTrigger, pedals.LeftTrigger);
         foreach (var (button, pressed) in buttons)
             pad.SetButtonState (button, pressed);
         pad.SubmitReport();

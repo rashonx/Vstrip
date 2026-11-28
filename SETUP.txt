@@ -1,4 +1,4 @@
-WHEEL BRIDGE v1.2.0 - Dodge City Plugins
+WHEEL BRIDGE v1.3.0 - Dodge City Plugins
 Moza wheel -> Xbox controller, with a constant centring force
 =============================================================
 
@@ -38,6 +38,18 @@ EVERY TIME YOU PLAY
      LB / RB = shift paddles, Start = pause menu.
 5. Click START BRIDGE, then start Need for Speed Most Wanted.
    The game sees an Xbox 360 controller. Use controller controls in the game menus.
+
+COMBINED PEDAL AXIS (section 3, new in v1.3)
+- "To game" picks how gas and brake reach the game:
+    Separate (RT gas, LT brake)  - normal Xbox triggers (default)
+    Combined on triggers         - gas minus brake: pressing both cancels out
+    Combined on right stick      - one axis: stick up = gas, stick down = brake
+    Combined on left stick       - same, on the left stick (steering stays left/right)
+  Use a combined stick for older games that want gas and brake on one axis. In the game's
+  controls, set accelerate / brake to that stick's up / down.
+- "Gas + brake on one axis": tick this if your pedals report both on ONE axis that rests in
+  the middle. Pick that axis as Throttle (the Brake box is then ignored). Feet off, then press
+  gas and brake all the way once each. If they come out backwards, tick Swap.
 
 TUNING
 - "Wheel rotation set in Moza Pit House": must match Pit House.

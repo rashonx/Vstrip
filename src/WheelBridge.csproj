@@ -8,7 +8,7 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <AssemblyName>WheelBridge</AssemblyName>
     <RootNamespace>WheelBridge</RootNamespace>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Product>Wheel Bridge</Product>
     <Company>Dodge City Plugins</Company>
     <ApplicationManifest>app.manifest</ApplicationManifest>

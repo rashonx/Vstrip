@@ -15,6 +15,11 @@ public class BridgeSettings
     public string BrakeAxis { get; set; } = "Z";
     public string ClutchAxis { get; set; } = "None";
 
+    // v1.3: combined pedal axes
+    public int PedalOutputMode { get; set; } = 0;        // see PedalMix.OutputModes
+    public bool SharedPedalAxis { get; set; } = false;   // gas and brake come in on one axis (the Throttle axis)
+    public bool SwapSharedPedals { get; set; } = false;
+
     public bool CenteringOn { get; set; } = true;
     public int CenteringPct { get; set; } = 35;
     public int DamperPct { get; set; } = 10;

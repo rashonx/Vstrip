@@ -5,7 +5,7 @@ namespace WheelBridge;
 
 public sealed class MainForm : Form
 {
-    const string Version = "1.2.0";
+    const string Version = "1.3.0";
     readonly BridgeSettings settings = BridgeSettings.Load();
     readonly Bridge bridge;
     readonly System.Windows.Forms.Timer uiTimer = new() { Interval = 33 };
@@ -282,6 +282,42 @@ public sealed class MainForm : Form
         recal.Click += (_, _) => { bridge.RecalibratePedals(); Status ("Pedals calibrated. Press each pedal all the way once."); };
         card.Controls.Add (recal);
         y += 38;
+
+        // Combined pedal axes
+        var outLabel = MakeLabel ("To game"); outLabel.SetBounds (12, y + 2, 70, 20); outLabel.ForeColor = Theme.Dim; card.Controls.Add (outLabel);
+        var outBox = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, BackColor = Theme.Track, ForeColor = Theme.Text, FlatStyle = FlatStyle.Flat };
+        outBox.Items.AddRange (PedalMix.OutputModes);
+        outBox.SelectedIndex = Math.Clamp (settings.PedalOutputMode, 0, PedalMix.OutputModes.Length - 1);
+        outBox.SetBounds (84, y, 228, 24);
+        outBox.SelectedIndexChanged += (_, _) =>
+        {
+            settings.PedalOutputMode = outBox.SelectedIndex;
+            settings.Save();
+            Status (outBox.SelectedIndex == 0 ? "Pedals go to the game as two triggers: RT gas, LT brake."
+                  : outBox.SelectedIndex == 1 ? "Pedals go to the game as one combined axis on the triggers: pressing both cancels out."
+                  : $"Pedals go to the game as one combined axis on the {(outBox.SelectedIndex == 2 ? "right" : "left")} stick: up is gas, down is brake. Set the game's gas/brake to that stick.");
+        };
+        card.Controls.Add (outBox);
+        y += 30;
+
+        var shared = new CheckBox { Text = "Gas + brake on one axis", Checked = settings.SharedPedalAxis, AutoSize = true, ForeColor = Theme.Text, BackColor = Theme.Card };
+        shared.Location = new Point (12, y);
+        var swap = new CheckBox { Text = "Swap", Checked = settings.SwapSharedPedals, AutoSize = true, ForeColor = Theme.Text, BackColor = Theme.Card, Enabled = settings.SharedPedalAxis };
+        swap.Location = new Point (230, y);
+        shared.CheckedChanged += (_, _) =>
+        {
+            settings.SharedPedalAxis = shared.Checked;
+            swap.Enabled = shared.Checked;
+            brakeBox.Enabled = !shared.Checked;
+            bridge.RecalibratePedals();
+            settings.Save();
+            if (shared.Checked) Status ("Combined pedal axis: feet off, then press gas and brake all the way once each. If they come out backwards, tick Swap.");
+        };
+        swap.CheckedChanged += (_, _) => { settings.SwapSharedPedals = swap.Checked; settings.Save(); };
+        brakeBox.Enabled = !settings.SharedPedalAxis;
+        card.Controls.Add (shared);
+        card.Controls.Add (swap);
+        y += 30;
 
         var bl = MakeLabel ("Xbox button  ←  wheel button (Set, then press)"); bl.SetBounds (12, y, 300, 20); bl.ForeColor = Theme.Dim; card.Controls.Add (bl);
         y += 22;
